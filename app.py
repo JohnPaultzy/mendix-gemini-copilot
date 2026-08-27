@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import uuid
 import re
+import json
 import config
 from core.chat_manager import (
     init_db, create_session, get_all_sessions, 
@@ -20,10 +21,9 @@ st.set_page_config(
 
 init_db()
 
-# 2. Custom CSS para sa Sticky Top Controls ug Polished UI
+# 2. Custom CSS
 st.markdown("""
 <style>
-/* Pinned / Sticky Top Bar para sa Inspection Scope ug File Uploader */
 div[data-testid="stVerticalBlock"] > div:has(div.sticky-header-marker) {
     position: sticky;
     top: 2.875rem;
@@ -34,10 +34,25 @@ div[data-testid="stVerticalBlock"] > div:has(div.sticky-header-marker) {
     border-bottom: 1px solid rgba(250, 250, 250, 0.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
+.stChatMessage {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.attached-badge {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    color: #94a3b8;
+    margin-top: 6px;
+    display: inline-block;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Session State Setup & Toast Handler
+# 3. Session State Setup
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
     create_session(st.session_state.session_id, "New Chat")
@@ -45,7 +60,6 @@ if "session_id" not in st.session_state:
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = config.SYSTEM_PROMPT_PRESETS["🛡️ Senior Mendix Architect (Strict Best Practices & SOD)"]
 
-# Ipakita ang Toast kung gikan nag-branch
 if "branch_toast" in st.session_state:
     st.toast(st.session_state.pop("branch_toast"), icon="🔀")
 
@@ -92,6 +106,14 @@ with st.sidebar:
     )
     st.session_state.system_prompt = system_instruction
     
+    # 📖 Reference Guide (.MD) Uploader
+    st.subheader("📖 Project Guidelines (.md)")
+    md_guideline = st.file_uploader(
+        "Upload Custom Guidelines (.md)",
+        type=["md"],
+        help="Upload .md files containing coding standards, PRD, or company rules."
+    )
+    
     st.divider()
     
     # Mendix Project Folder Input
@@ -100,7 +122,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Chat History List (Naay Confirmation Popover sa Delete)
+    # Chat History List
     st.subheader("💬 Chat History")
     sessions = get_all_sessions()
     
@@ -118,7 +140,6 @@ with st.sidebar:
                 st.session_state.session_id = s_id
                 st.rerun()
         with col2:
-            # 🔒 Delete Confirmation Popover para sa Sidebar
             with st.popover("🗑️", help="Delete Chat"):
                 st.write("**Delete chat?**")
                 if st.button("Confirm Delete", key=f"confirm_del_{s_id}", type="primary", use_container_width=True):
@@ -134,7 +155,7 @@ with st.container():
     st.markdown('<div class="sticky-header-marker"></div>', unsafe_allow_html=True)
     st.header("⚡ Mendix AI Assistant")
 
-    col_m1, col_m2 = st.columns([0.55, 0.45])
+    col_m1, col_m2 = st.columns([0.5, 0.5])
     with col_m1:
         scope_mode = st.radio(
             "🔍 Inspection Scope:",
@@ -143,10 +164,10 @@ with st.container():
         )
     with col_m2:
         uploaded_files = st.file_uploader(
-            "📎 Attach Files (Page .MPK, Screenshots, SCSS, XML)",
-            type=["png", "jpg", "jpeg", "xml", "json", "txt", "mpk", "scss", "css"],
+            "📎 Attach Files (Page .MPK, Screenshots, .MD, SCSS, XML)",
+            type=["png", "jpg", "jpeg", "xml", "json", "txt", "mpk", "scss", "css", "md"],
             accept_multiple_files=True,
-            help="Pwede ka mag-upload og Page .MPK, Screenshot, o SCSS file dungan!"
+            help="Pwede ka mag-upload og Page .MPK, Screenshots, .MD rules, o SCSS file dungan!"
         )
 
 # 6. RENDER CHAT MESSAGES
@@ -157,21 +178,18 @@ for msg in messages:
     content = msg["content"]
     
     with st.chat_message(role):
-        st.markdown(content)
+        st.markdown(content, unsafe_allow_html=True)
         
-        # Live HTML Preview for UI designs
         if role == "assistant" and "```html" in content:
             html_blocks = re.findall(r'```html(.*?)```', content, re.DOTALL)
             for idx, html_code in enumerate(html_blocks):
                 st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
                 components.html(html_code.strip(), height=680, scrolling=True)
         
-        # Limpyo nga Message Options nga naay Delete Confirmation
         with st.expander("⚙️ Message Options", expanded=False):
             btn_col1, btn_col2, _ = st.columns([0.25, 0.35, 0.4])
             
             with btn_col1:
-                # 🔒 Delete Confirmation Popover para sa Mensahe
                 with st.popover("🗑️ Delete", use_container_width=True):
                     st.write("**Delete this message?**")
                     if st.button("Confirm", key=f"confirm_msg_{msg_id}", type="primary", use_container_width=True):
@@ -186,20 +204,153 @@ for msg in messages:
                     st.session_state.branch_toast = "🔀 New branched conversation created successfully!"
                     st.rerun()
 
-# 7. CHAT INPUT & EXECUTION
-user_input = st.chat_input("Pangutana o ipasusi imong Mendix logic dinhi...")
+# 7. INTERACTIVE MULTI-IMAGE CLIPBOARD STAGING & REMOVAL GALLERY
+multi_paste_gallery_js = """
+<div id="staging-box" style="display:none; background:#1e293b; border:1px solid #334155; border-radius:8px; padding:10px 14px; margin-bottom:8px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:12px; color:#cbd5e1; font-weight:600;">
+            📸 Attached Screenshots (<span id="staged-count">0</span>) - <span style="color:#94a3b8; font-weight:normal;">Press Ctrl+V to add more</span>
+        </span>
+        <button onclick="clearAllStagedImages()" style="background:#ef4444; border:none; color:white; font-size:11px; padding:3px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">
+            Clear All 🗑️
+        </button>
+    </div>
+    <div id="thumbnails-wrapper" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+</div>
+
+<script>
+window.stagedPastedImages = window.stagedPastedImages || [];
+
+function renderThumbnails() {
+    const stagingBox = document.getElementById('staging-box');
+    const wrapper = document.getElementById('thumbnails-wrapper');
+    const countSpan = document.getElementById('staged-count');
+    const chatTextarea = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
+
+    if (!wrapper || !stagingBox) return;
+
+    if (window.stagedPastedImages.length === 0) {
+        stagingBox.style.display = 'none';
+        if (chatTextarea && chatTextarea.value.startsWith('📸 [')) {
+            chatTextarea.value = chatTextarea.value.replace(/^📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*/, '');
+        }
+        return;
+    }
+
+    stagingBox.style.display = 'block';
+    countSpan.innerText = window.stagedPastedImages.length;
+    wrapper.innerHTML = '';
+
+    window.stagedPastedImages.forEach((imgB64, index) => {
+        const thumbDiv = document.createElement('div');
+        thumbDiv.style.cssText = 'position:relative; width:64px; height:64px; border-radius:6px; overflow:hidden; border:2px solid #475569; background:#0f172a;';
+
+        const img = document.createElement('img');
+        img.src = imgB64;
+        img.style.cssText = 'width:100%; height:100%; object-fit:cover;';
+
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '✕';
+        delBtn.title = 'Remove this image';
+        delBtn.style.cssText = 'position:absolute; top:2px; right:2px; background:rgba(239,68,68,0.85); color:white; border:none; border-radius:50%; width:18px; height:18px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; font-weight:bold;';
+        delBtn.onclick = function(e) {
+            e.stopPropagation();
+            removeSingleImage(index);
+        };
+
+        thumbDiv.appendChild(img);
+        thumbDiv.appendChild(delBtn);
+        wrapper.appendChild(thumbDiv);
+    });
+
+    // Update prefix sa chat input
+    if (chatTextarea) {
+        const prefix = `📸 [${window.stagedPastedImages.length} Screenshot(s) Attached] `;
+        if (!chatTextarea.value.startsWith('📸 [')) {
+            chatTextarea.value = prefix + chatTextarea.value;
+        } else {
+            chatTextarea.value = chatTextarea.value.replace(/^📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*/, prefix);
+        }
+    }
+}
+
+function removeSingleImage(index) {
+    window.stagedPastedImages.splice(index, 1);
+    renderThumbnails();
+}
+
+function clearAllStagedImages() {
+    window.stagedPastedImages = [];
+    renderThumbnails();
+}
+
+function attachPasteHook() {
+    const chatTextarea = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
+    if (!chatTextarea || chatTextarea.getAttribute('data-gallery-paste-hooked')) return;
+
+    chatTextarea.setAttribute('data-gallery-paste-hooked', 'true');
+    
+    window.parent.document.addEventListener('paste', function(e) {
+        const items = (e.clipboardData || window.clipboardData).items;
+        let added = false;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    window.stagedPastedImages.push(event.target.result);
+                    renderThumbnails();
+                };
+                reader.readAsDataURL(blob);
+                added = true;
+            }
+        }
+    });
+}
+
+setInterval(attachPasteHook, 500);
+</script>
+"""
+components.html(multi_paste_gallery_js, height=105)
+
+# 8. CHAT INPUT & EXECUTION
+user_input = st.chat_input("Pangutana o i-Ctrl+V ang screenshots direkta dinhi...")
 
 if user_input:
+    # Check kung naay pasted images count sa prefix
+    pasted_count = 0
+    match = re.search(r'📸 \[([0-9]+) Screenshot\(s\) Attached\]', user_input)
+    if match:
+        pasted_count = int(match.group(1))
+        clean_user_input = re.sub(r'📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*', '', user_input)
+    else:
+        clean_user_input = user_input
+        
+    attached_names = []
+    if uploaded_files:
+        attached_names.extend([f.name for f in uploaded_files])
+    if md_guideline:
+        attached_names.append(f"Guideline: {md_guideline.name}")
+    if pasted_count > 0:
+        attached_names.append(f"{pasted_count} Pasted Screenshot(s)")
+        
+    final_user_content = clean_user_input if clean_user_input.strip() else "(Attached Images/Files)"
+    if attached_names:
+        final_user_content += f"\n\n<div class='attached-badge'>📎 Attached: {', '.join(attached_names)}</div>"
+
     with st.chat_message("user"):
-        st.markdown(user_input)
-        if uploaded_files:
-            file_names = [f.name for f in uploaded_files]
-            st.caption(f"📎 Attached: {', '.join(file_names)}")
+        st.markdown(final_user_content, unsafe_allow_html=True)
             
-    add_message(st.session_state.session_id, "user", user_input, has_attachment=1 if uploaded_files else 0)
+    add_message(st.session_state.session_id, "user", final_user_content, has_attachment=1 if attached_names else 0)
     
-    attachment_data = parse_uploaded_files(uploaded_files) if uploaded_files else []
+    # Process files
+    all_files_to_parse = list(uploaded_files) if uploaded_files else []
+    if md_guideline:
+        all_files_to_parse.append(md_guideline)
+        
+    attachment_data = parse_uploaded_files(all_files_to_parse)
     
+    # Context Preparation
     context_info = f"Inspection Scope Mode: {scope_mode}\n"
     if project_path:
         context_info += f"Mendix Local Project Path: {project_path}\n"
@@ -235,7 +386,6 @@ if user_input:
                     
                 response_placeholder.markdown(full_response)
                 
-                # Render Live HTML preview for the fresh assistant message
                 if "```html" in full_response:
                     html_blocks = re.findall(r'```html(.*?)```', full_response, re.DOTALL)
                     for idx, html_code in enumerate(html_blocks):

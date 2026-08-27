@@ -2,6 +2,8 @@ import os
 import zipfile
 import io
 import re
+import base64
+import json
 from PIL import Image
 
 def extract_page_structure_from_text(raw_text):
@@ -21,16 +23,43 @@ def extract_page_structure_from_text(raw_text):
         
     return "\n".join(summary)
 
-def parse_uploaded_files(uploaded_files):
-    """Basa sa daghang gi-upload nga Page .MPK, Images, o SCSS files."""
-    if not uploaded_files:
-        return []
+def parse_uploaded_files(uploaded_files, pasted_images_json=None):
+    """Basa sa daghang gi-upload nga files lakip ang MULTIPLE PASTED IMAGES."""
+    parsed_items = []
     
-    # Handle single file passed as not a list
+    # 1. Process Multiple Pasted Images gikan sa Clipboard
+    if pasted_images_json:
+        try:
+            # Pwede string list o JSON array
+            if isinstance(pasted_images_json, str):
+                try:
+                    pasted_list = json.loads(pasted_images_json)
+                except Exception:
+                    pasted_list = [pasted_images_json]
+            elif isinstance(pasted_images_json, list):
+                pasted_list = pasted_images_json
+            else:
+                pasted_list = []
+                
+            for idx, b64_str in enumerate(pasted_list):
+                if b64_str:
+                    if "," in b64_str:
+                        b64_str = b64_str.split(",")[1]
+                    img_bytes = base64.b64decode(b64_str)
+                    img = Image.open(io.BytesIO(img_bytes))
+                    parsed_items.append({
+                        "type": "image", 
+                        "data": img, 
+                        "name": f"Pasted_Screenshot_{idx+1}.png"
+                    })
+        except Exception as e:
+            parsed_items.append({"type": "text", "data": f"Error decoding pasted images: {e}", "name": "Clipboard_Error"})
+
+    if not uploaded_files:
+        return parsed_items
+    
     if not isinstance(uploaded_files, list):
         uploaded_files = [uploaded_files]
-        
-    parsed_items = []
     
     for f in uploaded_files:
         if f is None:
@@ -38,12 +67,24 @@ def parse_uploaded_files(uploaded_files):
             
         file_name = f.name.lower()
         
-        # 1. Screenshot Image
+        # 2. Screenshot Image file upload
         if f.type and "image" in f.type:
             image = Image.open(f)
             parsed_items.append({"type": "image", "data": image, "name": f.name})
             
-        # 2. Page / Microflow .MPK Package
+        # 3. .MD Reference / Guideline Document
+        elif file_name.endswith(".md"):
+            try:
+                content = f.read().decode("utf-8", errors="ignore")
+                parsed_items.append({
+                    "type": "text", 
+                    "data": f"📖 [ACTIVE REFERENCE / PROJECT GUIDELINE DOCUMENT ({f.name})]:\n\n{content}", 
+                    "name": f.name
+                })
+            except Exception as e:
+                parsed_items.append({"type": "text", "data": f"Error reading .md reference: {e}", "name": f.name})
+                
+        # 4. Page / Microflow .MPK Package
         elif file_name.endswith(".mpk"):
             try:
                 zip_buffer = io.BytesIO(f.read())
@@ -70,7 +111,7 @@ def parse_uploaded_files(uploaded_files):
             except Exception as e:
                 parsed_items.append({"type": "text", "data": f"Error parsing .mpk: {e}", "name": f.name})
                 
-        # 3. Text / SCSS / CSS / XML / JSON
+        # 5. Text / SCSS / CSS / XML / JSON
         else:
             try:
                 content = f.read().decode("utf-8", errors="ignore")
@@ -80,7 +121,6 @@ def parse_uploaded_files(uploaded_files):
                 
     return parsed_items
 
-# Alias para mosugot bisan 'parse_uploaded_file' ang tawag sa app.py
 def parse_uploaded_file(uploaded_file):
     return parse_uploaded_files(uploaded_file)
 
@@ -122,7 +162,7 @@ def scan_mendix_folder(folder_path):
     
     for root, dirs, files in os.walk(folder_path):
         for file in files:
-            if file.endswith((".mpr", ".xml", ".json", ".java", ".scss", ".css")):
+            if file.endswith((".mpr", ".xml", ".json", ".java", ".scss", ".css", ".md")):
                 rel_path = os.path.relpath(os.path.join(root, file), folder_path)
                 summary.append(f" - {rel_path}")
                 
