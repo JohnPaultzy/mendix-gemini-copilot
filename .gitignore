@@ -1,0 +1,15 @@
+# Credentials & Secrets
+.env
+
+# Local Database & Storage
+storage/*.db
+storage/*.db-journal
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Virtual Environment & OS
+.venv/
+env/
+.DS_Store
