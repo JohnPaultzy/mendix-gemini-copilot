@@ -7,13 +7,11 @@ import json
 from PIL import Image
 
 def extract_page_structure_from_text(raw_text):
-    """Mopili sa mga importanteng Mendix Page Elements gikan sa extracted MPK text."""
     containers = set(re.findall(r'\b(container[A-Za-z0-9_]*|layoutGrid[A-Za-z0-9_]*|dataView[A-Za-z0-9_]*|card[A-Za-z0-9_]*)\b', raw_text, re.IGNORECASE))
     classes = set(re.findall(r'class="([^"]+)"', raw_text))
     design_props = set(re.findall(r'designProperties="([^"]+)"', raw_text))
     
-    summary = []
-    summary.append("📑 PARSED MENDIX PAGE STRUCTURE & WIDGETS:")
+    summary = ["📑 PARSED MENDIX PAGE STRUCTURE & WIDGETS:"]
     if containers:
         summary.append(f"• Detected Containers/Wrappers: {', '.join(list(containers)[:30])}")
     if classes:
@@ -23,26 +21,21 @@ def extract_page_structure_from_text(raw_text):
         
     return "\n".join(summary)
 
-def parse_uploaded_files(uploaded_files, pasted_images_json=None):
-    """Basa sa daghang gi-upload nga files lakip ang MULTIPLE PASTED IMAGES."""
+def parse_uploaded_files(uploaded_files, pasted_images_b64=None):
+    """Basa sa tanang gi-upload nga files lakip ang Pasted Base64 Images."""
     parsed_items = []
     
-    # 1. Process Multiple Pasted Images gikan sa Clipboard
-    if pasted_images_json:
-        try:
-            # Pwede string list o JSON array
-            if isinstance(pasted_images_json, str):
-                try:
-                    pasted_list = json.loads(pasted_images_json)
-                except Exception:
-                    pasted_list = [pasted_images_json]
-            elif isinstance(pasted_images_json, list):
-                pasted_list = pasted_images_json
-            else:
-                pasted_list = []
+    # 1. Process Pasted Base64 Images gikan sa Custom Chatbox
+    if pasted_images_b64:
+        if isinstance(pasted_images_b64, str):
+            try:
+                pasted_images_b64 = json.loads(pasted_images_b64)
+            except Exception:
+                pasted_images_b64 = [pasted_images_b64]
                 
-            for idx, b64_str in enumerate(pasted_list):
-                if b64_str:
+        for idx, b64_str in enumerate(pasted_images_b64):
+            if b64_str:
+                try:
                     if "," in b64_str:
                         b64_str = b64_str.split(",")[1]
                     img_bytes = base64.b64decode(b64_str)
@@ -52,8 +45,8 @@ def parse_uploaded_files(uploaded_files, pasted_images_json=None):
                         "data": img, 
                         "name": f"Pasted_Screenshot_{idx+1}.png"
                     })
-        except Exception as e:
-            parsed_items.append({"type": "text", "data": f"Error decoding pasted images: {e}", "name": "Clipboard_Error"})
+                except Exception as e:
+                    parsed_items.append({"type": "text", "data": f"Error loading pasted image {idx+1}: {e}", "name": "Clipboard_Error"})
 
     if not uploaded_files:
         return parsed_items
@@ -72,7 +65,7 @@ def parse_uploaded_files(uploaded_files, pasted_images_json=None):
             image = Image.open(f)
             parsed_items.append({"type": "image", "data": image, "name": f.name})
             
-        # 3. .MD Reference / Guideline Document
+        # 3. .MD Reference Document
         elif file_name.endswith(".md"):
             try:
                 content = f.read().decode("utf-8", errors="ignore")
@@ -84,7 +77,7 @@ def parse_uploaded_files(uploaded_files, pasted_images_json=None):
             except Exception as e:
                 parsed_items.append({"type": "text", "data": f"Error reading .md reference: {e}", "name": f.name})
                 
-        # 4. Page / Microflow .MPK Package
+        # 4. .MPK Package
         elif file_name.endswith(".mpk"):
             try:
                 zip_buffer = io.BytesIO(f.read())
@@ -111,7 +104,7 @@ def parse_uploaded_files(uploaded_files, pasted_images_json=None):
             except Exception as e:
                 parsed_items.append({"type": "text", "data": f"Error parsing .mpk: {e}", "name": f.name})
                 
-        # 5. Text / SCSS / CSS / XML / JSON
+        # 5. Text / SCSS / CSS
         else:
             try:
                 content = f.read().decode("utf-8", errors="ignore")
@@ -125,19 +118,14 @@ def parse_uploaded_file(uploaded_file):
     return parse_uploaded_files(uploaded_file)
 
 def get_project_scss_context(project_path):
-    """Diretsong mobasa sa tanang SCSS files gikan sa theme/web/ folder sa Project Path."""
     if not project_path or not os.path.exists(project_path):
         return ""
     
     theme_web_dir = os.path.join(project_path, "theme", "web")
     if not os.path.exists(theme_web_dir):
-        return f"\n⚠️ Note: No theme/web folder found at {project_path}"
+        return ""
     
-    scss_dump = []
-    scss_dump.append(f"\n=======================================================")
-    scss_dump.append(f"🎨 LOCAL THEME SCSS FILES DETECTED (Path: {theme_web_dir})")
-    scss_dump.append(f"=======================================================")
-    
+    scss_dump = [f"\n🎨 LOCAL THEME SCSS FILES (Path: {theme_web_dir})\n"]
     for root, dirs, files in os.walk(theme_web_dir):
         for file in files:
             if file.endswith((".scss", ".css")):
@@ -146,24 +134,20 @@ def get_project_scss_context(project_path):
                 try:
                     with open(full_file_path, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read()
-                        scss_dump.append(f"\n--- SCSS FILE: {rel_path} (Full Path: {full_file_path}) ---")
+                        scss_dump.append(f"\n--- SCSS FILE: {rel_path} ---")
                         scss_dump.append(content[:15000])
-                except Exception as e:
-                    scss_dump.append(f"\nCould not read {rel_path}: {e}")
+                except Exception:
+                    continue
                     
     return "\n".join(scss_dump)
 
 def scan_mendix_folder(folder_path):
-    """Mobiyahe sa tibuok Mendix folder para sa Full Project Audit."""
     if not folder_path or not os.path.exists(folder_path):
-        return "Project folder not found or path is empty."
-    
+        return ""
     summary = [f"📁 MENDIX PROJECT ROOT: {folder_path}\n"]
-    
     for root, dirs, files in os.walk(folder_path):
         for file in files:
             if file.endswith((".mpr", ".xml", ".json", ".java", ".scss", ".css", ".md")):
                 rel_path = os.path.relpath(os.path.join(root, file), folder_path)
                 summary.append(f" - {rel_path}")
-                
     return "\n".join(summary[:100])

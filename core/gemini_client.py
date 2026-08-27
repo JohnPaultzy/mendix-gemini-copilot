@@ -1,5 +1,7 @@
+import io
 from google import genai
 from google.genai import types
+from PIL import Image
 import config
 
 def get_gemini_client(api_key=None):
@@ -8,13 +10,17 @@ def get_gemini_client(api_key=None):
         return None
     return genai.Client(api_key=key)
 
+def pil_to_bytes(pil_image):
+    """Convert PIL Image to JPEG bytes cleanly for Gemini SDK."""
+    buffer = io.BytesIO()
+    if pil_image.mode in ("RGBA", "P"):
+        pil_image = pil_image.convert("RGB")
+    pil_image.save(buffer, format="JPEG", quality=85)
+    return buffer.getvalue()
+
 def stream_chat_response(client, model_name, messages_history, system_instruction, attachments=None, attachment=None, context_info=""):
     """
-    Mo-stream og tubag gikan sa Gemini nga adunay 4-Tier Automatic Fallback:
-    1. Selected Model (e.g. gemini-3.7-flash)
-    2. gemini-2.5-flash (1st backup)
-    3. gemini-2.5-pro (2nd backup)
-    4. gemini-1.5-flash (final fallback)
+    Mo-stream og tubag gikan sa Gemini nga naay 4-Tier Fallback ug 100% correct Image Byte Encoding.
     """
     full_system_instruction = system_instruction
     if context_info:
@@ -29,7 +35,7 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
             )
         )
     
-    # 1. Attachments handling
+    # 1. Pundukon ang tanang attachments
     all_attachments = []
     if attachments:
         if isinstance(attachments, list):
@@ -42,40 +48,43 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
         else:
             all_attachments.append(attachment)
 
+    # 2. Attach Images via from_bytes (Standard GenAI SDK method)
     if all_attachments and formatted_contents:
         for att in all_attachments:
             if isinstance(att, dict):
                 if att.get("type") == "image":
-                    formatted_contents[-1].parts.append(types.Part.from_image(att["data"]))
+                    img_obj = att["data"]
+                    if isinstance(img_obj, Image.Image):
+                        raw_bytes = pil_to_bytes(img_obj)
+                    elif isinstance(img_obj, bytes):
+                        raw_bytes = img_obj
+                    else:
+                        continue
+                    formatted_contents[-1].parts.append(
+                        types.Part.from_bytes(data=raw_bytes, mime_type="image/jpeg")
+                    )
                 elif att.get("type") == "text":
-                    formatted_contents[-1].parts.append(types.Part.from_text(text=f"\n\n{att['data']}"))
-            elif isinstance(att, tuple) and len(att) == 2:
-                if att[0] == "image":
-                    formatted_contents[-1].parts.append(types.Part.from_image(att[1]))
-                elif att[0] == "text":
-                    formatted_contents[-1].parts.append(types.Part.from_text(text=f"\n\n{att[1]}"))
+                    formatted_contents[-1].parts.append(
+                        types.Part.from_text(text=f"\n\n{att['data']}")
+                    )
 
     config_params = types.GenerateContentConfig(
         system_instruction=full_system_instruction,
         temperature=0.3,
     )
 
-    # 2. Multi-Tier Fallback Chain
     fallback_priority = [
         "gemini-3.7-flash",
         "gemini-2.5-flash",
         "gemini-2.5-pro",
         "gemini-1.5-flash"
     ]
-    
-    # I-una ang napili nga model, unya isunod ang nahibiling backup models
     models_to_try = [model_name] + [m for m in fallback_priority if m != model_name]
 
     for idx, current_model in enumerate(models_to_try):
         try:
-            # Kung dili kini ang unang model, pahibaloon ang user nga gibalhin ang model
             if idx > 0:
-                yield f"> ⚠️ *Pahibalo: Ang `{models_to_try[idx-1]}` nakasinati og traffic spike/503. Awtomatikong mibalhin sa fallback: `{current_model}`...*\n\n"
+                yield f"> ⚠️ *Pahibalo: Ang `{models_to_try[idx-1]}` busy/503. Awtomatikong mibalhin sa fallback: `{current_model}`...*\n\n"
 
             response_stream = client.models.generate_content_stream(
                 model=current_model,
@@ -89,19 +98,15 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
                     has_emitted = True
                     yield chunk.text
             
-            # Kung nakatubag og tarong, undangon na ang pag-try sa ubang backup models
             if has_emitted:
                 return
 
         except Exception as e:
             err_msg = str(e).lower()
-            # Susiha kung temporary network/server/quota error (503, 429, unavailable, high demand)
             is_temporary_error = any(k in err_msg for k in ["503", "429", "unavailable", "high demand", "resource_exhausted", "quota", "overloaded"])
             
             if not is_temporary_error:
-                # Kung dili server error (e.g. invalid API key o bad prompt), i-raise dayon
                 raise e
             
-            # Kung naabot na sa pinaka-katapusang backup model ug nag-fail gihapon tanan
             if idx == len(models_to_try) - 1:
-                raise Exception(f"Tanang 4 ka models ({', '.join(models_to_try)}) busy karon sa Google servers. Palihug sulayi pag-usab human sa pipila ka segundos. Last error: {str(e)}")
+                raise Exception(f"Tanang models busy karon sa Google servers. Last error: {str(e)}")

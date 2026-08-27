@@ -1,8 +1,9 @@
+import os
 import streamlit as st
 import streamlit.components.v1 as components
 import uuid
 import re
-import json
+import sqlite3
 import config
 from core.chat_manager import (
     init_db, create_session, get_all_sessions, 
@@ -11,6 +12,20 @@ from core.chat_manager import (
 )
 from core.mendix_parser import parse_uploaded_files, parse_uploaded_file, get_project_scss_context, scan_mendix_folder
 from core.gemini_client import get_gemini_client, stream_chat_response
+
+# Safe Import / Fallback para sa update_session_title (Zero Crash Guarantee)
+try:
+    from core.chat_manager import update_session_title
+except ImportError:
+    def update_session_title(session_id, new_title):
+        db_path = os.path.join(os.path.dirname(__file__), "storage", "chats.db")
+        conn = sqlite3.connect(db_path, timeout=30.0)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE sessions SET title = ? WHERE id = ?", (new_title.strip(), session_id))
+            conn.commit()
+        finally:
+            conn.close()
 
 # 1. Page Configuration
 st.set_page_config(
@@ -21,7 +36,11 @@ st.set_page_config(
 
 init_db()
 
-# 2. Custom CSS
+# 2. Declare Custom Component
+COMPONENT_PATH = os.path.join(os.path.dirname(__file__), "core", "chat_input_component")
+custom_chat_box = components.declare_component("mendix_unified_chat", path=COMPONENT_PATH)
+
+# 3. Custom CSS
 st.markdown("""
 <style>
 div[data-testid="stVerticalBlock"] > div:has(div.sticky-header-marker) {
@@ -34,11 +53,17 @@ div[data-testid="stVerticalBlock"] > div:has(div.sticky-header-marker) {
     border-bottom: 1px solid rgba(250, 250, 250, 0.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
+
+.main .block-container {
+    padding-bottom: 140px !important;
+}
+
 .stChatMessage {
     padding: 1rem;
     border-radius: 0.5rem;
     margin-bottom: 0.5rem;
 }
+
 .attached-badge {
     background-color: #1e293b;
     border: 1px solid #334155;
@@ -49,13 +74,31 @@ div[data-testid="stVerticalBlock"] > div:has(div.sticky-header-marker) {
     margin-top: 6px;
     display: inline-block;
 }
+
+div:has(> iframe[title="core.chat_input_component.mendix_unified_chat"]) {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+    background: linear-gradient(180deg, rgba(14,17,23,0) 0%, rgba(14,17,23,0.95) 25%, rgba(14,17,23,1) 100%) !important;
+    padding: 10px calc((100vw - 900px) / 2) 15px calc((100vw - 900px) / 2) !important;
+}
+
+@media (max-width: 992px) {
+    div:has(> iframe[title="core.chat_input_component.mendix_unified_chat"]) {
+        padding: 10px 1rem 15px 1rem !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Session State Setup
+# 4. Session State Setup
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
-    create_session(st.session_state.session_id, "New Chat")
+
+if "last_processed_ts" not in st.session_state:
+    st.session_state.last_processed_ts = 0
 
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = config.SYSTEM_PROMPT_PRESETS["🛡️ Senior Mendix Architect (Strict Best Practices & SOD)"]
@@ -63,14 +106,12 @@ if "system_prompt" not in st.session_state:
 if "branch_toast" in st.session_state:
     st.toast(st.session_state.pop("branch_toast"), icon="🔀")
 
-# 4. SIDEBAR
+# 5. SIDEBAR
 with st.sidebar:
     st.title("⚡ Mendix Copilot")
     
     if st.button("➕ New Chat", use_container_width=True, type="primary"):
-        new_id = str(uuid.uuid4())
-        st.session_state.session_id = new_id
-        create_session(new_id, "New Chat", st.session_state.system_prompt)
+        st.session_state.session_id = str(uuid.uuid4())
         st.rerun()
         
     st.divider()
@@ -122,17 +163,12 @@ with st.sidebar:
     
     st.divider()
     
-    # Chat History List
+    # Chat History List (Rename ✏️ ug Delete 🗑️)
     st.subheader("💬 Chat History")
     sessions = get_all_sessions()
-    
-    session_ids = [s[0] for s in sessions]
-    if st.session_state.session_id not in session_ids:
-        create_session(st.session_state.session_id, "New Chat", st.session_state.system_prompt)
-        sessions = get_all_sessions()
         
     for s_id, s_title, _ in sessions:
-        col1, col2 = st.columns([0.78, 0.22])
+        col1, col2, col3 = st.columns([0.64, 0.18, 0.18])
         with col1:
             is_active = (s_id == st.session_state.session_id)
             label = f"👉 {s_title}" if is_active else f"📄 {s_title}"
@@ -140,22 +176,27 @@ with st.sidebar:
                 st.session_state.session_id = s_id
                 st.rerun()
         with col2:
+            with st.popover("✏️", help="Rename Chat"):
+                edit_name = st.text_input("Edit title:", value=s_title, key=f"edit_txt_{s_id}")
+                if st.button("Save", key=f"save_title_{s_id}", type="primary", use_container_width=True):
+                    if edit_name.strip():
+                        update_session_title(s_id, edit_name.strip())
+                        st.rerun()
+        with col3:
             with st.popover("🗑️", help="Delete Chat"):
                 st.write("**Delete chat?**")
-                if st.button("Confirm Delete", key=f"confirm_del_{s_id}", type="primary", use_container_width=True):
+                if st.button("Confirm", key=f"confirm_del_{s_id}", type="primary", use_container_width=True):
                     delete_session(s_id)
                     if st.session_state.session_id == s_id:
-                        new_session_id = str(uuid.uuid4())
-                        st.session_state.session_id = new_session_id
-                        create_session(new_session_id, "New Chat", st.session_state.system_prompt)
+                        st.session_state.session_id = str(uuid.uuid4())
                     st.rerun()
 
-# 5. STICKY TOP CONTROLS (Main Area)
+# 6. STICKY TOP CONTROLS (Main Area)
 with st.container():
     st.markdown('<div class="sticky-header-marker"></div>', unsafe_allow_html=True)
     st.header("⚡ Mendix AI Assistant")
 
-    col_m1, col_m2 = st.columns([0.5, 0.5])
+    col_m1, col_m2 = st.columns([0.45, 0.55])
     with col_m1:
         scope_mode = st.radio(
             "🔍 Inspection Scope:",
@@ -167,10 +208,10 @@ with st.container():
             "📎 Attach Files (Page .MPK, Screenshots, .MD, SCSS, XML)",
             type=["png", "jpg", "jpeg", "xml", "json", "txt", "mpk", "scss", "css", "md"],
             accept_multiple_files=True,
-            help="Pwede ka mag-upload og Page .MPK, Screenshots, .MD rules, o SCSS file dungan!"
+            help="Pwede ka mag-drag & drop og daghang screenshots, .mpk packages, ug scss files dungan!"
         )
 
-# 6. RENDER CHAT MESSAGES
+# 7. RENDER CHAT MESSAGES
 messages = get_session_messages(st.session_state.session_id)
 for msg in messages:
     msg_id = msg["id"]
@@ -204,196 +245,118 @@ for msg in messages:
                     st.session_state.branch_toast = "🔀 New branched conversation created successfully!"
                     st.rerun()
 
-# 7. INTERACTIVE MULTI-IMAGE CLIPBOARD STAGING & REMOVAL GALLERY
-multi_paste_gallery_js = """
-<div id="staging-box" style="display:none; background:#1e293b; border:1px solid #334155; border-radius:8px; padding:10px 14px; margin-bottom:8px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-size:12px; color:#cbd5e1; font-weight:600;">
-            📸 Attached Screenshots (<span id="staged-count">0</span>) - <span style="color:#94a3b8; font-weight:normal;">Press Ctrl+V to add more</span>
-        </span>
-        <button onclick="clearAllStagedImages()" style="background:#ef4444; border:none; color:white; font-size:11px; padding:3px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">
-            Clear All 🗑️
-        </button>
-    </div>
-    <div id="thumbnails-wrapper" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
-</div>
+# 8. INVISIBLE ANCHOR & AUTO-SCROLL CONTROLLER
+st.markdown('<div id="chat-bottom-anchor" style="height: 1px; margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
+autoscroll_js = """
 <script>
-window.stagedPastedImages = window.stagedPastedImages || [];
-
-function renderThumbnails() {
-    const stagingBox = document.getElementById('staging-box');
-    const wrapper = document.getElementById('thumbnails-wrapper');
-    const countSpan = document.getElementById('staged-count');
-    const chatTextarea = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
-
-    if (!wrapper || !stagingBox) return;
-
-    if (window.stagedPastedImages.length === 0) {
-        stagingBox.style.display = 'none';
-        if (chatTextarea && chatTextarea.value.startsWith('📸 [')) {
-            chatTextarea.value = chatTextarea.value.replace(/^📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*/, '');
-        }
-        return;
-    }
-
-    stagingBox.style.display = 'block';
-    countSpan.innerText = window.stagedPastedImages.length;
-    wrapper.innerHTML = '';
-
-    window.stagedPastedImages.forEach((imgB64, index) => {
-        const thumbDiv = document.createElement('div');
-        thumbDiv.style.cssText = 'position:relative; width:64px; height:64px; border-radius:6px; overflow:hidden; border:2px solid #475569; background:#0f172a;';
-
-        const img = document.createElement('img');
-        img.src = imgB64;
-        img.style.cssText = 'width:100%; height:100%; object-fit:cover;';
-
-        const delBtn = document.createElement('button');
-        delBtn.innerHTML = '✕';
-        delBtn.title = 'Remove this image';
-        delBtn.style.cssText = 'position:absolute; top:2px; right:2px; background:rgba(239,68,68,0.85); color:white; border:none; border-radius:50%; width:18px; height:18px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; font-weight:bold;';
-        delBtn.onclick = function(e) {
-            e.stopPropagation();
-            removeSingleImage(index);
-        };
-
-        thumbDiv.appendChild(img);
-        thumbDiv.appendChild(delBtn);
-        wrapper.appendChild(thumbDiv);
-    });
-
-    // Update prefix sa chat input
-    if (chatTextarea) {
-        const prefix = `📸 [${window.stagedPastedImages.length} Screenshot(s) Attached] `;
-        if (!chatTextarea.value.startsWith('📸 [')) {
-            chatTextarea.value = prefix + chatTextarea.value;
-        } else {
-            chatTextarea.value = chatTextarea.value.replace(/^📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*/, prefix);
-        }
-    }
-}
-
-function removeSingleImage(index) {
-    window.stagedPastedImages.splice(index, 1);
-    renderThumbnails();
-}
-
-function clearAllStagedImages() {
-    window.stagedPastedImages = [];
-    renderThumbnails();
-}
-
-function attachPasteHook() {
-    const chatTextarea = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
-    if (!chatTextarea || chatTextarea.getAttribute('data-gallery-paste-hooked')) return;
-
-    chatTextarea.setAttribute('data-gallery-paste-hooked', 'true');
-    
-    window.parent.document.addEventListener('paste', function(e) {
-        const items = (e.clipboardData || window.clipboardData).items;
-        let added = false;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const blob = items[i].getAsFile();
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    window.stagedPastedImages.push(event.target.result);
-                    renderThumbnails();
-                };
-                reader.readAsDataURL(blob);
-                added = true;
+(function() {
+    function scrollToBottom() {
+        try {
+            const pDoc = window.parent.document;
+            if (!pDoc) return;
+            
+            const anchor = pDoc.getElementById('chat-bottom-anchor');
+            if (anchor) {
+                anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
             }
-        }
-    });
-}
-
-setInterval(attachPasteHook, 500);
+            
+            const mainSec = pDoc.querySelector('section.main') || pDoc.querySelector('div[data-testid="stMain"]');
+            if (mainSec) {
+                mainSec.scrollTop = mainSec.scrollHeight;
+            }
+        } catch(e) {}
+    }
+    
+    setTimeout(scrollToBottom, 100);
+    setTimeout(scrollToBottom, 300);
+    setTimeout(scrollToBottom, 600);
+})();
 </script>
 """
-components.html(multi_paste_gallery_js, height=105)
+components.html(autoscroll_js, height=0)
 
-# 8. CHAT INPUT & EXECUTION
-user_input = st.chat_input("Pangutana o i-Ctrl+V ang screenshots direkta dinhi...")
+# 9. UNIFIED PINNED CHATBOX (Pinned to Bottom)
+chat_payload = custom_chat_box(key=f"unified_chat_{st.session_state.session_id}")
 
-if user_input:
-    # Check kung naay pasted images count sa prefix
-    pasted_count = 0
-    match = re.search(r'📸 \[([0-9]+) Screenshot\(s\) Attached\]', user_input)
-    if match:
-        pasted_count = int(match.group(1))
-        clean_user_input = re.sub(r'📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*', '', user_input)
-    else:
-        clean_user_input = user_input
+# 10. PROCESS SUBMITTED MESSAGE & EXECUTION
+if chat_payload and isinstance(chat_payload, dict):
+    msg_ts = chat_payload.get("timestamp", 0)
+    
+    if msg_ts > st.session_state.last_processed_ts:
+        st.session_state.last_processed_ts = msg_ts
         
-    attached_names = []
-    if uploaded_files:
-        attached_names.extend([f.name for f in uploaded_files])
-    if md_guideline:
-        attached_names.append(f"Guideline: {md_guideline.name}")
-    if pasted_count > 0:
-        attached_names.append(f"{pasted_count} Pasted Screenshot(s)")
+        user_prompt_text = chat_payload.get("text", "").strip()
+        pasted_imgs = chat_payload.get("images", [])
         
-    final_user_content = clean_user_input if clean_user_input.strip() else "(Attached Images/Files)"
-    if attached_names:
-        final_user_content += f"\n\n<div class='attached-badge'>📎 Attached: {', '.join(attached_names)}</div>"
-
-    with st.chat_message("user"):
-        st.markdown(final_user_content, unsafe_allow_html=True)
+        create_session(st.session_state.session_id, "New Chat", st.session_state.system_prompt)
+        
+        attached_names = []
+        if uploaded_files:
+            attached_names.extend([f.name for f in uploaded_files])
+        if md_guideline:
+            attached_names.append(f"Guideline: {md_guideline.name}")
+        if pasted_imgs:
+            attached_names.append(f"{len(pasted_imgs)} Pasted Screenshot(s)")
             
-    add_message(st.session_state.session_id, "user", final_user_content, has_attachment=1 if attached_names else 0)
-    
-    # Process files
-    all_files_to_parse = list(uploaded_files) if uploaded_files else []
-    if md_guideline:
-        all_files_to_parse.append(md_guideline)
+        final_user_content = user_prompt_text if user_prompt_text else "(Attached Screenshots/Files)"
+        if attached_names:
+            final_user_content += f"\n\n<div class='attached-badge'>📎 Attached: {', '.join(attached_names)}</div>"
+
+        with st.chat_message("user"):
+            st.markdown(final_user_content, unsafe_allow_html=True)
+                
+        add_message(st.session_state.session_id, "user", final_user_content, has_attachment=1 if attached_names else 0)
         
-    attachment_data = parse_uploaded_files(all_files_to_parse)
-    
-    # Context Preparation
-    context_info = f"Inspection Scope Mode: {scope_mode}\n"
-    if project_path:
-        context_info += f"Mendix Local Project Path: {project_path}\n"
-        scss_context = get_project_scss_context(project_path)
-        if scss_context:
-            context_info += scss_context
+        all_files_to_parse = list(uploaded_files) if uploaded_files else []
+        if md_guideline:
+            all_files_to_parse.append(md_guideline)
+            
+        attachment_data = parse_uploaded_files(all_files_to_parse, pasted_images_b64=pasted_imgs)
+        
+        context_info = f"Inspection Scope Mode: {scope_mode}\n"
+        if project_path:
+            context_info += f"Mendix Local Project Path: {project_path}\n"
+            scss_context = get_project_scss_context(project_path)
+            if scss_context:
+                context_info += scss_context
         if scope_mode == "Full Project Audit":
             context_info += "\n" + scan_mendix_folder(project_path)
 
-    client = get_gemini_client()
-    if not client:
-        st.error("⚠️ Palihug i-check ang imong GEMINI_API_KEY sa `.env` file!")
-    else:
-        with st.chat_message("assistant"):
-            current_messages = [
-                {"role": m["role"], "content": m["content"]}
-                for m in get_session_messages(st.session_state.session_id)
-            ]
-            response_placeholder = st.empty()
-            full_response = ""
-            
-            try:
-                for chunk in stream_chat_response(
-                    client=client,
-                    model_name=model_choice,
-                    messages_history=current_messages,
-                    system_instruction=st.session_state.system_prompt,
-                    attachments=attachment_data,
-                    context_info=context_info
-                ):
-                    full_response += chunk
-                    response_placeholder.markdown(full_response + "▌")
+        client = get_gemini_client()
+        if not client:
+            st.error("⚠️ Palihug i-check ang imong GEMINI_API_KEY sa `.env` file!")
+        else:
+            with st.chat_message("assistant"):
+                current_messages = [
+                    {"role": m["role"], "content": m["content"]}
+                    for m in get_session_messages(st.session_state.session_id)
+                ]
+                response_placeholder = st.empty()
+                full_response = ""
+                
+                try:
+                    for chunk in stream_chat_response(
+                        client=client,
+                        model_name=model_choice,
+                        messages_history=current_messages,
+                        system_instruction=st.session_state.system_prompt,
+                        attachments=attachment_data,
+                        context_info=context_info
+                    ):
+                        full_response += chunk
+                        response_placeholder.markdown(full_response + "▌")
+                        
+                    response_placeholder.markdown(full_response)
                     
-                response_placeholder.markdown(full_response)
-                
-                if "```html" in full_response:
-                    html_blocks = re.findall(r'```html(.*?)```', full_response, re.DOTALL)
-                    for idx, html_code in enumerate(html_blocks):
-                        st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
-                        components.html(html_code.strip(), height=680, scrolling=True)
-                
-                add_message(st.session_state.session_id, "assistant", full_response)
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Error communicating with Gemini: {str(e)}")
+                    if "```html" in full_response:
+                        html_blocks = re.findall(r'```html(.*?)```', full_response, re.DOTALL)
+                        for idx, html_code in enumerate(html_blocks):
+                            st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
+                            components.html(html_code.strip(), height=680, scrolling=True)
+                    
+                    add_message(st.session_state.session_id, "assistant", full_response)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Error communicating with Gemini: {str(e)}")

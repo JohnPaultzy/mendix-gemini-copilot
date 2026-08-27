@@ -1,14 +1,14 @@
 import sqlite3
 import os
+import re
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "chats.db")
 
 def get_db_connection():
-    """Mokuha og SQLite connection nga naay timeout ug WAL mode para dili ma-lock."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=30.0) # 30 seconds timeout to prevent locking
-    conn.execute("PRAGMA journal_mode=WAL;")      # Write-Ahead Logging para smooth multi-threading
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
     return conn
 
 def init_db():
@@ -34,6 +34,10 @@ def init_db():
                 FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
             )
         """)
+        cursor.execute("""
+            DELETE FROM sessions 
+            WHERE id NOT IN (SELECT DISTINCT session_id FROM messages)
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -54,8 +58,12 @@ def get_all_sessions():
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        # Kuhaon ang sessions nga naay sulod o bag-ong gihimo
-        cursor.execute("SELECT id, title, created_at FROM sessions ORDER BY created_at DESC")
+        cursor.execute("""
+            SELECT DISTINCT s.id, s.title, s.created_at 
+            FROM sessions s
+            INNER JOIN messages m ON s.id = m.session_id
+            ORDER BY s.created_at DESC
+        """)
         sessions = cursor.fetchall()
         return sessions
     finally:
@@ -83,20 +91,30 @@ def add_message(session_id, role, content, has_attachment=0):
             (session_id, role, content, has_attachment, datetime.now())
         )
         
-        # Auto-update sa Title base sa 1st user message
         if role == "user":
             cursor.execute("SELECT COUNT(*) FROM messages WHERE session_id = ?", (session_id,))
             if cursor.fetchone()[0] == 1:
                 clean_title = content.replace("\n", " ").strip()
-                short_title = (clean_title[:28] + '...') if len(clean_title) > 28 else clean_title
-                cursor.execute("UPDATE sessions SET title = ? WHERE id = ?", (short_title, session_id))
+                clean_title = re.sub(r'📸 \[[0-9]+ Screenshot\(s\) Attached\]\s*', '', clean_title)
+                clean_title = re.sub(r'<div class=[\'"]attached-badge[\'"].*?</div>', '', clean_title, flags=re.DOTALL).strip()
+                short_title = (clean_title[:24] + '...') if len(clean_title) > 24 else clean_title
+                cursor.execute("UPDATE sessions SET title = ? WHERE id = ?", (short_title if short_title.strip() else "Chat Session", session_id))
                 
         conn.commit()
     finally:
         conn.close()
 
+def update_session_title(session_id, new_title):
+    """Bag-ohon ang Title/Ngalan sa Chat Session."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE sessions SET title = ? WHERE id = ?", (new_title.strip(), session_id))
+        conn.commit()
+    finally:
+        conn.close()
+
 def delete_single_message(message_id):
-    """Papason ang usa ka specific nga mensahe."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -106,7 +124,6 @@ def delete_single_message(message_id):
         conn.close()
 
 def delete_session(session_id):
-    """GI-AYO: Gigamit ang 'id' imbes nga 'session_id' para sa sessions table."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -117,7 +134,6 @@ def delete_session(session_id):
         conn.close()
 
 def branch_session_from_message(current_session_id, message_id, new_session_id):
-    """Mokopya sa chat history gikan sa sinugdanan hangtod sa gipiling mensahe."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -126,7 +142,7 @@ def branch_session_from_message(current_session_id, message_id, new_session_id):
         old_title = session_row[0] if session_row else "Branched Chat"
         sys_prompt = session_row[1] if session_row else ""
         
-        new_title = f"🔀 Branch: {old_title[:18]}"
+        new_title = f"🔀 Branch: {old_title[:14]}"
         cursor.execute(
             "INSERT INTO sessions (id, title, system_instruction, created_at) VALUES (?, ?, ?, ?)",
             (new_session_id, new_title, sys_prompt, datetime.now())

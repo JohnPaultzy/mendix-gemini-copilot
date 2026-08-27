@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: transparent; padding: 4px; }
+  
+  .chat-container {
+    width: 100%;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    transition: border-color 0.2s;
+  }
+  .chat-container:focus-within {
+    border-color: #38bdf8;
+  }
+
+  .thumbnails-bar {
+    display: none;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #334155;
+  }
+  .thumbnails-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  .clear-all-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .thumbs-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .thumb-card {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid #38bdf8;
+    background: #0f172a;
+  }
+  .thumb-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .thumb-del-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 15px;
+    height: 15px;
+    font-size: 9px;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  .input-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #f8fafc;
+    font-size: 14px;
+    resize: none;
+    line-height: 1.4;
+    max-height: 120px;
+    min-height: 28px;
+  }
+  textarea::placeholder {
+    color: #64748b;
+  }
+
+  .send-btn {
+    background: #0284c7;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+  .send-btn:hover {
+    background: #0369a1;
+  }
+</style>
+</head>
+<body>
+
+<div class="chat-container" id="chat-box">
+  <!-- Dynamic Thumbnail Previews -->
+  <div class="thumbnails-bar" id="thumbs-bar">
+    <div class="thumbnails-header">
+      <span>📸 Attached Screenshots (<span id="img-count">0</span>)</span>
+      <button class="clear-all-btn" onclick="clearAllImages(event)">Clear All ✕</button>
+    </div>
+    <div class="thumbs-list" id="thumbs-list"></div>
+  </div>
+
+  <!-- Text Input & Send Button -->
+  <div class="input-row">
+    <textarea id="msg-input" placeholder="Pangutana o i-Ctrl+V ang screenshots direkta dinhi..." rows="1"></textarea>
+    <button class="send-btn" id="send-btn" onclick="submitMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+let pastedImages = [];
+const msgInput = document.getElementById('msg-input');
+const thumbsBar = document.getElementById('thumbs-bar');
+const thumbsList = document.getElementById('thumbs-list');
+const imgCount = document.getElementById('img-count');
+
+function notifyHeight() {
+  const height = Math.max(document.body.scrollHeight + 12, 65);
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: "streamlit:setFrameHeight",
+    height: height
+  }, "*");
+}
+
+function notifyReady() {
+  // Ang nawala nga Handshake Signal aron mawala ang infinite loading!
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: "streamlit:componentReady",
+    apiVersion: 1
+  }, "*");
+  notifyHeight();
+}
+
+function sendToStreamlit(value) {
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: "streamlit:setComponentValue",
+    value: value
+  }, "*");
+}
+
+// 1. Direct Clipboard Paste sulod sa Chatbox
+msgInput.addEventListener('paste', function(e) {
+  const items = (e.clipboardData || window.clipboardData).items;
+  let hasImg = false;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      e.preventDefault();
+      const blob = items[i].getAsFile();
+      const img = new Image();
+      img.src = URL.createObjectURL(blob);
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1600;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round((height * maxDim) / width); width = maxDim; }
+          else { width = Math.round((width * maxDim) / height); height = maxDim; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        pastedImages.push(canvas.toDataURL('image/jpeg', 0.85));
+        renderThumbnails();
+      };
+      hasImg = true;
+    }
+  }
+});
+
+// Auto-grow textarea
+msgInput.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = (this.scrollHeight) + 'px';
+  notifyHeight();
+});
+
+// Enter key submit
+msgInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitMessage();
+  }
+});
+
+function renderThumbnails() {
+  if (pastedImages.length === 0) {
+    thumbsBar.style.display = 'none';
+    notifyHeight();
+    return;
+  }
+
+  thumbsBar.style.display = 'block';
+  imgCount.innerText = pastedImages.length;
+  thumbsList.innerHTML = '';
+
+  pastedImages.forEach((b64, idx) => {
+    const card = document.createElement('div');
+    card.className = 'thumb-card';
+    
+    const img = document.createElement('img');
+    img.src = b64;
+    
+    const del = document.createElement('button');
+    del.className = 'thumb-del-btn';
+    del.innerHTML = '✕';
+    del.title = 'Remove';
+    del.onclick = function(ev) {
+      ev.stopPropagation();
+      pastedImages.splice(idx, 1);
+      renderThumbnails();
+    };
+
+    card.appendChild(img);
+    card.appendChild(del);
+    thumbsList.appendChild(card);
+  });
+
+  notifyHeight();
+}
+
+function clearAllImages(e) {
+  if (e) e.stopPropagation();
+  pastedImages = [];
+  renderThumbnails();
+}
+
+function submitMessage() {
+  const text = msgInput.value.trim();
+  if (!text && pastedImages.length === 0) return;
+
+  const payload = {
+    text: text,
+    images: [...pastedImages],
+    timestamp: Date.now()
+  };
+
+  sendToStreamlit(payload);
+
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+  pastedImages = [];
+  renderThumbnails();
+  notifyHeight();
+}
+
+// Handshake execution
+window.addEventListener('load', notifyReady);
+document.addEventListener('DOMContentLoaded', notifyReady);
+setTimeout(notifyReady, 50);
+setTimeout(notifyReady, 300);
+</script>
+</body>
+</html>
