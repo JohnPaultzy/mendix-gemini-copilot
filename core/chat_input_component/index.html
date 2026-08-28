@@ -4,15 +4,16 @@
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { background: transparent; padding: 4px; }
+  body { background: transparent; padding: 0; margin: 0; overflow: hidden; display: flex; justify-content: center; width: 100%; }
   
   .chat-container {
     width: 100%;
+    max-width: 100%;
     background: #1e293b;
     border: 1px solid #334155;
     border-radius: 12px;
-    padding: 8px 12px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    padding: 8px 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     transition: border-color 0.2s;
   }
   .chat-container:focus-within {
@@ -21,7 +22,7 @@
 
   .thumbnails-bar {
     display: none;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     padding-bottom: 6px;
     border-bottom: 1px solid #334155;
   }
@@ -29,7 +30,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     font-size: 11px;
     color: #94a3b8;
     font-weight: 600;
@@ -57,6 +58,12 @@
     overflow: hidden;
     border: 2px solid #38bdf8;
     background: #0f172a;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .thumb-card:hover {
+    transform: scale(1.08);
+    border-color: #7dd3fc;
   }
   .thumb-card img {
     width: 100%;
@@ -65,9 +72,9 @@
   }
   .thumb-del-btn {
     position: absolute;
-    top: 2px;
-    right: 2px;
-    background: rgba(239, 68, 68, 0.9);
+    top: 1px;
+    right: 1px;
+    background: rgba(239, 68, 68, 0.95);
     color: white;
     border: none;
     border-radius: 50%;
@@ -80,12 +87,13 @@
     align-items: center;
     justify-content: center;
     font-weight: bold;
+    z-index: 10;
   }
 
   .input-row {
     display: flex;
-    align-items: flex-end;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
   }
   textarea {
     flex: 1;
@@ -96,8 +104,9 @@
     font-size: 14px;
     resize: none;
     line-height: 1.4;
-    max-height: 120px;
+    max-height: 100px;
     min-height: 28px;
+    padding-top: 3px;
   }
   textarea::placeholder {
     color: #64748b;
@@ -125,16 +134,14 @@
 <body>
 
 <div class="chat-container" id="chat-box">
-  <!-- Dynamic Thumbnail Previews -->
   <div class="thumbnails-bar" id="thumbs-bar">
     <div class="thumbnails-header">
-      <span>📸 Attached Screenshots (<span id="img-count">0</span>)</span>
+      <span>📸 Attached Screenshots (<span id="img-count">0</span>) - <i>Click to view centered</i></span>
       <button class="clear-all-btn" onclick="clearAllImages(event)">Clear All ✕</button>
     </div>
     <div class="thumbs-list" id="thumbs-list"></div>
   </div>
 
-  <!-- Text Input & Send Button -->
   <div class="input-row">
     <textarea id="msg-input" placeholder="Pangutana o i-Ctrl+V ang screenshots direkta dinhi..." rows="1"></textarea>
     <button class="send-btn" id="send-btn" onclick="submitMessage()">➤</button>
@@ -149,7 +156,7 @@ const thumbsList = document.getElementById('thumbs-list');
 const imgCount = document.getElementById('img-count');
 
 function notifyHeight() {
-  const height = Math.max(document.body.scrollHeight + 12, 65);
+  const height = Math.max(document.body.scrollHeight + 6, 52);
   window.parent.postMessage({
     isStreamlitMessage: true,
     type: "streamlit:setFrameHeight",
@@ -158,13 +165,13 @@ function notifyHeight() {
 }
 
 function notifyReady() {
-  // Ang nawala nga Handshake Signal aron mawala ang infinite loading!
   window.parent.postMessage({
     isStreamlitMessage: true,
     type: "streamlit:componentReady",
     apiVersion: 1
   }, "*");
   notifyHeight();
+  forcePinToBottom();
 }
 
 function sendToStreamlit(value) {
@@ -175,7 +182,83 @@ function sendToStreamlit(value) {
   }, "*");
 }
 
-// 1. Direct Clipboard Paste sulod sa Chatbox
+// 🔒 DYNAMIC SIDEBAR-AWARE VIEWPORT PINNING (Never overlaps sidebar!)
+function forcePinToBottom() {
+  try {
+    const parentDoc = window.parent.document;
+    if (!parentDoc) return;
+    const iframe = window.frameElement;
+    if (iframe) {
+      const container = iframe.closest('div[data-testid="stCustomComponentV1"]') || iframe.closest('div.element-container') || iframe.parentElement;
+      if (container) {
+        const sidebar = parentDoc.querySelector('section[data-testid="stSidebar"]');
+        const isSidebarVisible = sidebar && sidebar.getBoundingClientRect().width > 50;
+        const sidebarWidth = isSidebarVisible ? Math.round(sidebar.getBoundingClientRect().width) : 0;
+        
+        container.style.setProperty('position', 'fixed', 'important');
+        container.style.setProperty('bottom', '0px', 'important');
+        container.style.setProperty('left', sidebarWidth + 'px', 'important');
+        container.style.setProperty('right', '0px', 'important');
+        container.style.setProperty('width', `calc(100vw - ${sidebarWidth}px)`, 'important');
+        container.style.setProperty('z-index', '999999', 'important');
+        container.style.setProperty('background', 'linear-gradient(180deg, rgba(14,17,23,0) 0%, rgba(14,17,23,0.96) 25%, #0e1117 100%)', 'important');
+        container.style.setProperty('padding', '2px 2rem 8px 2rem', 'important');
+        container.style.setProperty('margin', '0', 'important');
+        container.style.setProperty('box-sizing', 'border-box', 'important');
+      }
+    }
+  } catch(e) {}
+}
+
+setInterval(forcePinToBottom, 200);
+
+// Global Centered Screen Lightbox Modal
+function openCenteredLightbox(b64) {
+  const parentDoc = window.parent.document;
+  if (!parentDoc) return;
+
+  let modal = parentDoc.getElementById('mendix-global-lightbox-modal');
+  if (!modal) {
+    modal = parentDoc.createElement('div');
+    modal.id = 'mendix-global-lightbox-modal';
+    modal.style.cssText = `
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(10, 15, 29, 0.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      z-index: 99999999; align-items: center; justify-content: center; flex-direction: column; padding: 20px; cursor: zoom-out;
+    `;
+    modal.innerHTML = `
+      <div style="width: 85vw; max-width: 1100px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: #cbd5e1; font-size: 13px; font-weight: 600; cursor: default;">
+        <span>🔍 <b>Screenshot Preview</b> (Press <kbd>Esc</kbd> or click outside to close)</span>
+        <button id="mendix-lightbox-close-btn" style="background: #ef4444; color: white; border: none; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-weight: bold;">
+          Close ✕
+        </button>
+      </div>
+      <img id="mendix-lightbox-img-element" src="" style="max-width: 85vw; max-height: 82vh; border-radius: 10px; box-shadow: 0 12px 48px rgba(0, 0, 0, 0.85); border: 2px solid #38bdf8; object-fit: contain; background: #020617; cursor: default;">
+    `;
+    parentDoc.body.appendChild(modal);
+
+    modal.onclick = function() { modal.style.display = 'none'; };
+
+    const closeBtn = parentDoc.getElementById('mendix-lightbox-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = function(e) {
+        e.stopPropagation();
+        modal.style.display = 'none';
+      };
+    }
+
+    parentDoc.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') modal.style.display = 'none';
+    });
+  }
+
+  const imgElem = parentDoc.getElementById('mendix-lightbox-img-element');
+  if (imgElem) {
+    imgElem.src = b64;
+    modal.style.display = 'flex';
+  }
+}
+
 msgInput.addEventListener('paste', function(e) {
   const items = (e.clipboardData || window.clipboardData).items;
   let hasImg = false;
@@ -207,14 +290,12 @@ msgInput.addEventListener('paste', function(e) {
   }
 });
 
-// Auto-grow textarea
 msgInput.addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = (this.scrollHeight) + 'px';
   notifyHeight();
 });
 
-// Enter key submit
 msgInput.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -236,6 +317,8 @@ function renderThumbnails() {
   pastedImages.forEach((b64, idx) => {
     const card = document.createElement('div');
     card.className = 'thumb-card';
+    card.title = 'Click to view centered';
+    card.onclick = () => openCenteredLightbox(b64);
     
     const img = document.createElement('img');
     img.src = b64;
@@ -283,7 +366,6 @@ function submitMessage() {
   notifyHeight();
 }
 
-// Handshake execution
 window.addEventListener('load', notifyReady);
 document.addEventListener('DOMContentLoaded', notifyReady);
 setTimeout(notifyReady, 50);

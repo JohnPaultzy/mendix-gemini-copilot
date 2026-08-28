@@ -11,7 +11,6 @@ def get_gemini_client(api_key=None):
     return genai.Client(api_key=key)
 
 def pil_to_bytes(pil_image):
-    """Convert PIL Image to JPEG bytes cleanly for Gemini SDK."""
     buffer = io.BytesIO()
     if pil_image.mode in ("RGBA", "P"):
         pil_image = pil_image.convert("RGB")
@@ -19,9 +18,6 @@ def pil_to_bytes(pil_image):
     return buffer.getvalue()
 
 def stream_chat_response(client, model_name, messages_history, system_instruction, attachments=None, attachment=None, context_info=""):
-    """
-    Mo-stream og tubag gikan sa Gemini nga naay 4-Tier Fallback ug 100% correct Image Byte Encoding.
-    """
     full_system_instruction = system_instruction
     if context_info:
         full_system_instruction += f"\n\n[ADDITIONAL MENDIX CONTEXT]:\n{context_info}"
@@ -35,7 +31,6 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
             )
         )
     
-    # 1. Pundukon ang tanang attachments
     all_attachments = []
     if attachments:
         if isinstance(attachments, list):
@@ -48,7 +43,6 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
         else:
             all_attachments.append(attachment)
 
-    # 2. Attach Images via from_bytes (Standard GenAI SDK method)
     if all_attachments and formatted_contents:
         for att in all_attachments:
             if isinstance(att, dict):
@@ -73,11 +67,13 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
         temperature=0.3,
     )
 
+    # Active Models Fallback Chain (Removed deprecated 2.5-pro)
     fallback_priority = [
         "gemini-3.7-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-1.5-flash"
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash"
     ]
     models_to_try = [model_name] + [m for m in fallback_priority if m != model_name]
 
@@ -103,7 +99,7 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
 
         except Exception as e:
             err_msg = str(e).lower()
-            is_temporary_error = any(k in err_msg for k in ["503", "429", "unavailable", "high demand", "resource_exhausted", "quota", "overloaded"])
+            is_temporary_error = any(k in err_msg for k in ["503", "429", "404", "unavailable", "high demand", "resource_exhausted", "quota", "overloaded"])
             
             if not is_temporary_error:
                 raise e

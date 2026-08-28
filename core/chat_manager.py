@@ -43,11 +43,12 @@ def init_db():
         conn.close()
 
 def create_session(session_id, title="New Chat", system_instruction=""):
+    """INSERT OR IGNORE aron DILI ma-overwrite ang existing chat title!"""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT OR REPLACE INTO sessions (id, title, system_instruction, created_at) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO sessions (id, title, system_instruction, created_at) VALUES (?, ?, ?, ?)",
             (session_id, title, system_instruction, datetime.now())
         )
         conn.commit()
@@ -105,7 +106,6 @@ def add_message(session_id, role, content, has_attachment=0):
         conn.close()
 
 def update_session_title(session_id, new_title):
-    """Bag-ohon ang Title/Ngalan sa Chat Session."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()

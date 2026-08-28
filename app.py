@@ -3,29 +3,18 @@ import streamlit as st
 import streamlit.components.v1 as components
 import uuid
 import re
-import sqlite3
 import config
 from core.chat_manager import (
     init_db, create_session, get_all_sessions, 
     get_session_messages, add_message, delete_session,
-    delete_single_message, branch_session_from_message
+    delete_single_message, branch_session_from_message,
+    update_session_title
 )
-from core.mendix_parser import parse_uploaded_files, parse_uploaded_file, get_project_scss_context, scan_mendix_folder
+from core.mendix_parser import (
+    parse_uploaded_files, parse_uploaded_file, get_project_scss_context,
+    scan_mendix_folder, extract_domain_model_mermaid
+)
 from core.gemini_client import get_gemini_client, stream_chat_response
-
-# Safe Import / Fallback para sa update_session_title (Zero Crash Guarantee)
-try:
-    from core.chat_manager import update_session_title
-except ImportError:
-    def update_session_title(session_id, new_title):
-        db_path = os.path.join(os.path.dirname(__file__), "storage", "chats.db")
-        conn = sqlite3.connect(db_path, timeout=30.0)
-        try:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE sessions SET title = ? WHERE id = ?", (new_title.strip(), session_id))
-            conn.commit()
-        finally:
-            conn.close()
 
 # 1. Page Configuration
 st.set_page_config(
@@ -40,54 +29,75 @@ init_db()
 COMPONENT_PATH = os.path.join(os.path.dirname(__file__), "core", "chat_input_component")
 custom_chat_box = components.declare_component("mendix_unified_chat", path=COMPONENT_PATH)
 
-# 3. Custom CSS
+# 3. Custom CSS (Sidebar-Aware Docking & Spacing)
 st.markdown("""
 <style>
+/* Sticky Top Controls */
 div[data-testid="stVerticalBlock"] > div:has(div.sticky-header-marker) {
     position: sticky;
     top: 2.875rem;
     background-color: rgba(14, 17, 23, 0.95);
     backdrop-filter: blur(8px);
     z-index: 99;
-    padding: 10px 0 15px 0;
+    padding: 6px 0 8px 0;
     border-bottom: 1px solid rgba(250, 250, 250, 0.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
+/* Chat Messages Spacing */
 .main .block-container {
-    padding-bottom: 140px !important;
+    padding-bottom: 100px !important;
+    padding-top: 1rem !important;
 }
 
 .stChatMessage {
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.8rem !important;
+    border-radius: 0.5rem !important;
+    margin-bottom: 0.2rem !important;
+}
+
+div[data-testid="stExpander"] {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px !important;
+}
+.streamlit-expanderHeader {
+    padding: 3px 8px !important;
+    font-size: 0.82rem !important;
+    min-height: 1.4rem !important;
 }
 
 .attached-badge {
     background-color: #1e293b;
     border: 1px solid #334155;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.82rem;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.78rem;
     color: #94a3b8;
-    margin-top: 6px;
+    margin-top: 3px;
     display: inline-block;
 }
 
-div:has(> iframe[title="core.chat_input_component.mendix_unified_chat"]) {
+/* 🔒 Fixed Bottom Wrapper (Sidebar Aware) */
+div[data-testid="stCustomComponentV1"] {
     position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 1000 !important;
-    background: linear-gradient(180deg, rgba(14,17,23,0) 0%, rgba(14,17,23,0.95) 25%, rgba(14,17,23,1) 100%) !important;
-    padding: 10px calc((100vw - 900px) / 2) 15px calc((100vw - 900px) / 2) !important;
+    bottom: 0px !important;
+    left: 18rem !important;
+    right: 0px !important;
+    width: calc(100vw - 18rem) !important;
+    z-index: 999999 !important;
+    background: linear-gradient(180deg, rgba(14,17,23,0) 0%, rgba(14,17,23,0.96) 25%, #0e1117 100%) !important;
+    padding: 0px 2rem 6px 2rem !important;
+    margin: 0px !important;
+    box-sizing: border-box !important;
 }
 
 @media (max-width: 992px) {
-    div:has(> iframe[title="core.chat_input_component.mendix_unified_chat"]) {
-        padding: 10px 1rem 15px 1rem !important;
+    div[data-testid="stCustomComponentV1"] {
+        left: 0px !important;
+        width: 100vw !important;
+        padding: 0px 1rem 6px 1rem !important;
     }
 }
 </style>
@@ -100,8 +110,14 @@ if "session_id" not in st.session_state:
 if "last_processed_ts" not in st.session_state:
     st.session_state.last_processed_ts = 0
 
+if "session_parsed_files" not in st.session_state:
+    st.session_state.session_parsed_files = {}
+
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = config.SYSTEM_PROMPT_PRESETS["🛡️ Senior Mendix Architect (Strict Best Practices & SOD)"]
+
+if "last_domain_model" not in st.session_state:
+    st.session_state.last_domain_model = None
 
 if "branch_toast" in st.session_state:
     st.toast(st.session_state.pop("branch_toast"), icon="🔀")
@@ -116,12 +132,12 @@ with st.sidebar:
         
     st.divider()
     
-    # Model Selection
     model_options = [
         "gemini-3.7-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-1.5-flash"
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash"
     ]
     default_model_idx = model_options.index(config.DEFAULT_MODEL) if config.DEFAULT_MODEL in model_options else 0
     
@@ -130,8 +146,12 @@ with st.sidebar:
         options=model_options,
         index=default_model_idx
     )
+
+    _current_msgs_for_est = get_session_messages(st.session_state.session_id)
+    _total_chars = sum(len(m["content"]) for m in _current_msgs_for_est)
+    _approx_tokens = _total_chars // 4
+    st.caption(f"📊 ~{_approx_tokens:,} tokens estimate (niining chat)")
     
-    # System Instructions
     st.subheader("📝 System Instructions")
     preset_choice = st.selectbox("Prompt Presets", options=list(config.SYSTEM_PROMPT_PRESETS.keys()))
     
@@ -152,6 +172,7 @@ with st.sidebar:
     md_guideline = st.file_uploader(
         "Upload Custom Guidelines (.md)",
         type=["md"],
+        key=f"guideline_{st.session_state.session_id}",
         help="Upload .md files containing coding standards, PRD, or company rules."
     )
     
@@ -163,7 +184,7 @@ with st.sidebar:
     
     st.divider()
     
-    # Chat History List (Rename ✏️ ug Delete 🗑️)
+    # Chat History List
     st.subheader("💬 Chat History")
     sessions = get_all_sessions()
         
@@ -172,7 +193,7 @@ with st.sidebar:
         with col1:
             is_active = (s_id == st.session_state.session_id)
             label = f"👉 {s_title}" if is_active else f"📄 {s_title}"
-            if st.button(label, key=f"btn_{s_id}", use_container_width=True):
+            if st.button(label, key=f"btn_{s_id}", use_container_width=True, disabled=is_active):
                 st.session_state.session_id = s_id
                 st.rerun()
         with col2:
@@ -201,6 +222,7 @@ with st.container():
         scope_mode = st.radio(
             "🔍 Inspection Scope:",
             ["Single Microflow Focus", "Workflow Chain Check", "Full Project Audit"],
+            key=f"scope_{st.session_state.session_id}",
             horizontal=True
         )
     with col_m2:
@@ -208,8 +230,66 @@ with st.container():
             "📎 Attach Files (Page .MPK, Screenshots, .MD, SCSS, XML)",
             type=["png", "jpg", "jpeg", "xml", "json", "txt", "mpk", "scss", "css", "md"],
             accept_multiple_files=True,
+            key=f"uploader_{st.session_state.session_id}",
             help="Pwede ka mag-drag & drop og daghang screenshots, .mpk packages, ug scss files dungan!"
         )
+
+# 6b. DOMAIN MODEL DIAGRAM GENERATOR (Mermaid)
+with st.expander("🧬 Domain Model Diagram Generator (Beta — gikan sa .mpk)", expanded=False):
+    st.caption("I-attach usa o daghang `.mpk` files sa uploader sa taas, unya i-click aron ma-generate ang Entity Relationship diagram (Mermaid).")
+    if st.button("🧬 Generate Domain Model Diagram", key="gen_domain_model_btn"):
+        mermaid_code, dm_summary = extract_domain_model_mermaid(uploaded_files)
+        st.session_state.last_domain_model = (mermaid_code, dm_summary)
+        st.rerun()
+
+    if st.session_state.last_domain_model:
+        mermaid_code, dm_summary = st.session_state.last_domain_model
+        st.caption(dm_summary)
+        if mermaid_code:
+            mermaid_html = f"""
+            <div class="mermaid">{mermaid_code}</div>
+            <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+            <script>
+                mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
+            </script>
+            """
+            components.html(mermaid_html, height=450, scrolling=True)
+            with st.expander("📄 Raw Mermaid Code", expanded=False):
+                st.code(mermaid_code, language="mermaid")
+
+# 🌟 DYNAMIC AUTO-FIT RESIZING LIVE PREVIEW (Mo-expand base sa tinuod nga gidak-on sa sulod!)
+def render_live_preview(html_code, idx):
+    st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
+    
+    auto_resize_script = """
+    <script>
+    (function() {
+        function autoResize() {
+            const body = document.body;
+            const html = document.documentElement;
+            const h = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            window.parent.postMessage({
+                isStreamlitMessage: true,
+                type: "streamlit:setFrameHeight",
+                height: Math.max(h + 20, 260)
+            }, "*");
+        }
+        window.addEventListener("load", autoResize);
+        window.addEventListener("resize", autoResize);
+        setTimeout(autoResize, 50);
+        setTimeout(autoResize, 200);
+        setTimeout(autoResize, 600);
+        try {
+            new ResizeObserver(autoResize).observe(document.body);
+        } catch(e) {}
+    })();
+    </script>
+    """
+    clean_html = f"<div style='display:flex; justify-content:center; width:100%; min-height:220px;'>{html_code}</div>" + auto_resize_script
+    components.html(clean_html, height=360, scrolling=True)
+    
+    with st.expander(f"💻 View HTML & CSS Code (#{idx+1})", expanded=False):
+        st.code(html_code, language="html")
 
 # 7. RENDER CHAT MESSAGES
 messages = get_session_messages(st.session_state.session_id)
@@ -219,13 +299,15 @@ for msg in messages:
     content = msg["content"]
     
     with st.chat_message(role):
-        st.markdown(content, unsafe_allow_html=True)
+        clean_text_display = re.sub(r'```html.*?```', '', content, flags=re.DOTALL).strip()
+        if clean_text_display:
+            st.markdown(clean_text_display, unsafe_allow_html=True)
         
         if role == "assistant" and "```html" in content:
-            html_blocks = re.findall(r'```html(.*?)```', content, re.DOTALL)
-            for idx, html_code in enumerate(html_blocks):
-                st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
-                components.html(html_code.strip(), height=680, scrolling=True)
+            raw_html_blocks = re.findall(r'```html(.*?)```', content, re.DOTALL)
+            valid_blocks = [h.strip() for h in raw_html_blocks if len(h.strip()) > 30]
+            for idx, html_code in enumerate(valid_blocks):
+                render_live_preview(html_code, idx)
         
         with st.expander("⚙️ Message Options", expanded=False):
             btn_col1, btn_col2, _ = st.columns([0.25, 0.35, 0.4])
@@ -245,9 +327,15 @@ for msg in messages:
                     st.session_state.branch_toast = "🔀 New branched conversation created successfully!"
                     st.rerun()
 
-# 8. INVISIBLE ANCHOR & AUTO-SCROLL CONTROLLER
-st.markdown('<div id="chat-bottom-anchor" style="height: 1px; margin-bottom: 20px;"></div>', unsafe_allow_html=True)
+needs_resume = (len(messages) > 0 and messages[-1]["role"] == "user")
+if needs_resume:
+    st.warning("⚠️ Na-interrup ang miaging tubag sa AI niining chata.")
+    if st.button("🔄 Resume / Generate Response", type="primary"):
+        st.session_state.trigger_resume = True
+        st.rerun()
 
+# Auto-Scroll Anchor
+st.markdown('<div id="chat-bottom-anchor" style="height: 1px; margin-bottom: 2px;"></div>', unsafe_allow_html=True)
 autoscroll_js = """
 <script>
 (function() {
@@ -255,19 +343,12 @@ autoscroll_js = """
         try {
             const pDoc = window.parent.document;
             if (!pDoc) return;
-            
             const anchor = pDoc.getElementById('chat-bottom-anchor');
-            if (anchor) {
-                anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }
-            
+            if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
             const mainSec = pDoc.querySelector('section.main') || pDoc.querySelector('div[data-testid="stMain"]');
-            if (mainSec) {
-                mainSec.scrollTop = mainSec.scrollHeight;
-            }
+            if (mainSec) mainSec.scrollTop = mainSec.scrollHeight;
         } catch(e) {}
     }
-    
     setTimeout(scrollToBottom, 100);
     setTimeout(scrollToBottom, 300);
     setTimeout(scrollToBottom, 600);
@@ -276,21 +357,30 @@ autoscroll_js = """
 """
 components.html(autoscroll_js, height=0)
 
-# 9. UNIFIED PINNED CHATBOX (Pinned to Bottom)
+# 8. UNIFIED FIXED BOTTOM CHATBOX
 chat_payload = custom_chat_box(key=f"unified_chat_{st.session_state.session_id}")
 
-# 10. PROCESS SUBMITTED MESSAGE & EXECUTION
+# 9. PROCESS SUBMISSION & EXECUTION
+should_execute = False
+user_prompt_text = ""
+pasted_imgs = []
+
 if chat_payload and isinstance(chat_payload, dict):
     msg_ts = chat_payload.get("timestamp", 0)
-    
     if msg_ts > st.session_state.last_processed_ts:
         st.session_state.last_processed_ts = msg_ts
-        
         user_prompt_text = chat_payload.get("text", "").strip()
         pasted_imgs = chat_payload.get("images", [])
-        
-        create_session(st.session_state.session_id, "New Chat", st.session_state.system_prompt)
-        
+        should_execute = True
+
+elif st.session_state.get("trigger_resume", False):
+    st.session_state.trigger_resume = False
+    should_execute = True
+
+if should_execute:
+    create_session(st.session_state.session_id, "New Chat", st.session_state.system_prompt)
+    
+    if not needs_resume or user_prompt_text:
         attached_names = []
         if uploaded_files:
             attached_names.extend([f.name for f in uploaded_files])
@@ -307,31 +397,42 @@ if chat_payload and isinstance(chat_payload, dict):
             st.markdown(final_user_content, unsafe_allow_html=True)
                 
         add_message(st.session_state.session_id, "user", final_user_content, has_attachment=1 if attached_names else 0)
+    
+    all_files_to_parse = list(uploaded_files) if uploaded_files else []
+    if md_guideline:
+        all_files_to_parse.append(md_guideline)
         
-        all_files_to_parse = list(uploaded_files) if uploaded_files else []
-        if md_guideline:
-            all_files_to_parse.append(md_guideline)
-            
-        attachment_data = parse_uploaded_files(all_files_to_parse, pasted_images_b64=pasted_imgs)
-        
-        context_info = f"Inspection Scope Mode: {scope_mode}\n"
-        if project_path:
-            context_info += f"Mendix Local Project Path: {project_path}\n"
-            scss_context = get_project_scss_context(project_path)
-            if scss_context:
-                context_info += scss_context
+    attachment_data = parse_uploaded_files(all_files_to_parse, pasted_images_b64=pasted_imgs)
+    
+    if all_files_to_parse:
+        st.session_state.session_parsed_files[st.session_state.session_id] = attachment_data
+    else:
+        prev_parsed = st.session_state.session_parsed_files.get(st.session_state.session_id, [])
+        attachment_data = [item for item in prev_parsed if item.get("type") == "image"]
+        if pasted_imgs:
+            fresh_img_data = parse_uploaded_files([], pasted_images_b64=pasted_imgs)
+            attachment_data.extend(fresh_img_data)
+    
+    context_info = f"Inspection Scope Mode: {scope_mode}\n"
+    if project_path:
+        context_info += f"Mendix Local Project Path: {project_path}\n"
+        scss_context = get_project_scss_context(project_path)
+        if scss_context:
+            context_info += scss_context
         if scope_mode == "Full Project Audit":
             context_info += "\n" + scan_mendix_folder(project_path)
 
-        client = get_gemini_client()
-        if not client:
-            st.error("⚠️ Palihug i-check ang imong GEMINI_API_KEY sa `.env` file!")
-        else:
-            with st.chat_message("assistant"):
-                current_messages = [
-                    {"role": m["role"], "content": m["content"]}
-                    for m in get_session_messages(st.session_state.session_id)
-                ]
+    client = get_gemini_client()
+    if not client:
+        st.error("⚠️ Palihug i-check ang imong GEMINI_API_KEY sa `.env` file!")
+    else:
+        with st.chat_message("assistant"):
+            current_messages = [
+                {"role": m["role"], "content": m["content"]}
+                for m in get_session_messages(st.session_state.session_id)
+            ]
+            
+            with st.status(f"🧠 Mendix Copilot ({model_choice}) is analyzing & generating...", expanded=True) as status_box:
                 response_placeholder = st.empty()
                 full_response = ""
                 
@@ -345,18 +446,22 @@ if chat_payload and isinstance(chat_payload, dict):
                         context_info=context_info
                     ):
                         full_response += chunk
-                        response_placeholder.markdown(full_response + "▌")
+                        live_text = re.sub(r'```html.*?```', '', full_response, flags=re.DOTALL).strip()
+                        response_placeholder.markdown(live_text + "▌")
                         
-                    response_placeholder.markdown(full_response)
+                    status_box.update(label="✅ Response Ready!", state="complete", expanded=False)
+                    final_text = re.sub(r'```html.*?```', '', full_response, flags=re.DOTALL).strip()
+                    response_placeholder.markdown(final_text)
                     
                     if "```html" in full_response:
-                        html_blocks = re.findall(r'```html(.*?)```', full_response, re.DOTALL)
-                        for idx, html_code in enumerate(html_blocks):
-                            st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
-                            components.html(html_code.strip(), height=680, scrolling=True)
+                        raw_html_blocks = re.findall(r'```html(.*?)```', full_response, re.DOTALL)
+                        valid_blocks = [h.strip() for h in raw_html_blocks if len(h.strip()) > 30]
+                        for idx, html_code in enumerate(valid_blocks):
+                            render_live_preview(html_code, idx)
                     
                     add_message(st.session_state.session_id, "assistant", full_response)
                     st.rerun()
                     
                 except Exception as e:
+                    status_box.update(label="❌ Error Generating Response", state="error", expanded=True)
                     st.error(f"Error communicating with Gemini: {str(e)}")

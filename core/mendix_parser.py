@@ -25,7 +25,6 @@ def parse_uploaded_files(uploaded_files, pasted_images_b64=None):
     """Basa sa tanang gi-upload nga files lakip ang Pasted Base64 Images."""
     parsed_items = []
     
-    # 1. Process Pasted Base64 Images gikan sa Custom Chatbox
     if pasted_images_b64:
         if isinstance(pasted_images_b64, str):
             try:
@@ -60,12 +59,10 @@ def parse_uploaded_files(uploaded_files, pasted_images_b64=None):
             
         file_name = f.name.lower()
         
-        # 2. Screenshot Image file upload
         if f.type and "image" in f.type:
             image = Image.open(f)
             parsed_items.append({"type": "image", "data": image, "name": f.name})
             
-        # 3. .MD Reference Document
         elif file_name.endswith(".md"):
             try:
                 content = f.read().decode("utf-8", errors="ignore")
@@ -77,9 +74,9 @@ def parse_uploaded_files(uploaded_files, pasted_images_b64=None):
             except Exception as e:
                 parsed_items.append({"type": "text", "data": f"Error reading .md reference: {e}", "name": f.name})
                 
-        # 4. .MPK Package
         elif file_name.endswith(".mpk"):
             try:
+                f.seek(0)
                 zip_buffer = io.BytesIO(f.read())
                 extracted = [f"📦 UPLOADED PACKAGE (.MPK): {f.name}\n"]
                 raw_combined = []
@@ -104,7 +101,6 @@ def parse_uploaded_files(uploaded_files, pasted_images_b64=None):
             except Exception as e:
                 parsed_items.append({"type": "text", "data": f"Error parsing .mpk: {e}", "name": f.name})
                 
-        # 5. Text / SCSS / CSS
         else:
             try:
                 content = f.read().decode("utf-8", errors="ignore")
@@ -151,3 +147,89 @@ def scan_mendix_folder(folder_path):
                 rel_path = os.path.relpath(os.path.join(root, file), folder_path)
                 summary.append(f" - {rel_path}")
     return "\n".join(summary[:100])
+
+
+def extract_domain_model_mermaid(uploaded_files):
+    """
+    Best-effort nga pag-parse sa Entities/Associations gikan sa .mpk package(s)
+    aron mahimo nga Mermaid erDiagram string.
+
+    IMPORTANTE: Walay official public schema para sa Mendix domain-model XML,
+    mao nga kini nga parser gamit ra regex sa mga common nga pattern (Entity /
+    Association tags) nga makit-an sa extracted XML files sulod sa .mpk.
+    Puede dili 100% kompleto sa tanang Mendix version, pero maghatag og
+    maayong starting point/preview sa entity relationships.
+    """
+    if not uploaded_files:
+        return None, "Walay na-upload nga .mpk file para ma-scan."
+
+    if not isinstance(uploaded_files, list):
+        uploaded_files = [uploaded_files]
+
+    entities = set()
+    associations = []  # (parent_short, child_short, assoc_name)
+
+    entity_pattern = re.compile(r'<Entities\.Entity[^>]*Name="([A-Za-z0-9_]+)"', re.IGNORECASE)
+    entity_pattern_alt = re.compile(r'<Entity[^>]*[Nn]ame="([A-Za-z0-9_]+)"')
+    assoc_pattern = re.compile(
+        r'<Entities\.Association[^>]*Name="([A-Za-z0-9_]+)"[^>]*?Parent="([A-Za-z0-9_.]+)"[^>]*?Child="([A-Za-z0-9_.]+)"',
+        re.IGNORECASE | re.DOTALL
+    )
+
+    found_any_mpk = False
+
+    for f in uploaded_files:
+        if f is None:
+            continue
+        file_name = f.name.lower()
+        if not file_name.endswith(".mpk"):
+            continue
+        found_any_mpk = True
+        try:
+            f.seek(0)
+            zip_buffer = io.BytesIO(f.read())
+            with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
+                for info in zip_ref.infolist():
+                    if info.is_dir():
+                        continue
+                    if info.filename.endswith(('.png', '.jpg', '.jpeg', '.jar')):
+                        continue
+                    try:
+                        with zip_ref.open(info) as sub_f:
+                            content = sub_f.read().decode('utf-8', errors='ignore')
+                    except Exception:
+                        continue
+
+                    for m in entity_pattern.finditer(content):
+                        entities.add(m.group(1))
+                    for m in entity_pattern_alt.finditer(content):
+                        entities.add(m.group(1))
+                    for m in assoc_pattern.finditer(content):
+                        assoc_name, parent, child = m.group(1), m.group(2), m.group(3)
+                        parent_short = parent.split(".")[-1]
+                        child_short = child.split(".")[-1]
+                        associations.append((parent_short, child_short, assoc_name))
+                        entities.add(parent_short)
+                        entities.add(child_short)
+        except Exception:
+            continue
+
+    if not found_any_mpk:
+        return None, "Walay .mpk file nga na-detect sa imong gi-attach. I-attach usa ka .mpk aron ma-generate ang diagram."
+
+    if not entities:
+        return None, "Na-scan ang .mpk pero walay entity pattern nga nakit-an. Posible lahi ang XML structure niini nga Mendix version, o dili domain model ang naa sa sulod niini nga package."
+
+    lines = ["erDiagram"]
+    for parent, child, name in associations:
+        safe_name = re.sub(r'[^A-Za-z0-9_]', '_', name) or "relates_to"
+        lines.append(f'    {parent} ||--o{{ {child} : "{safe_name}"')
+
+    linked_entities = {e for pair in associations for e in pair[:2]}
+    orphan_entities = entities - linked_entities
+    for e in sorted(orphan_entities):
+        lines.append(f"    {e}")
+
+    mermaid_code = "\n".join(lines)
+    summary = f"✅ {len(entities)} entities ug {len(associations)} associations ang nakit-an."
+    return mermaid_code, summary
