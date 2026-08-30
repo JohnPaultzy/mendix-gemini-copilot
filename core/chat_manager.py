@@ -43,7 +43,6 @@ def init_db():
         conn.close()
 
 def create_session(session_id, title="New Chat", system_instruction=""):
-    """INSERT OR IGNORE aron DILI ma-overwrite ang existing chat title!"""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -160,6 +159,30 @@ def branch_session_from_message(current_session_id, message_id, new_session_id):
                 (new_session_id, role, content, has_att, datetime.now())
             )
             
+        conn.commit()
+    finally:
+        conn.close()
+
+def transfer_session_to_new(current_session_id, new_session_id):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT title, system_instruction FROM sessions WHERE id = ?", (current_session_id,))
+        session_row = cursor.fetchone()
+        old_title = session_row[0] if session_row else "Previous Chat"
+        sys_prompt = session_row[1] if session_row else ""
+        
+        new_title = f"⏩ Cont: {old_title[:14]}"
+        cursor.execute(
+            "INSERT INTO sessions (id, title, system_instruction, created_at) VALUES (?, ?, ?, ?)",
+            (new_session_id, new_title, sys_prompt, datetime.now())
+        )
+        
+        summary_text = f"🔄 **[SESSION TRANSFERRED FROM: '{old_title}']**\n\nNapadayon kini nga panagsultianay gikan sa karaan nga chat session. Ang tanang context sa gi-upload nga Mendix files ug guidelines nagpabilin nga aktibo."
+        cursor.execute(
+            "INSERT INTO messages (session_id, role, content, has_attachment, created_at) VALUES (?, ?, ?, ?, ?)",
+            (new_session_id, "assistant", summary_text, 1, datetime.now())
+        )
         conn.commit()
     finally:
         conn.close()

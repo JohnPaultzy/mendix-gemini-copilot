@@ -3,13 +3,62 @@ import streamlit as st
 import streamlit.components.v1 as components
 import uuid
 import re
+import sqlite3
+from datetime import datetime
 import config
-from core.chat_manager import (
-    init_db, create_session, get_all_sessions, 
-    get_session_messages, add_message, delete_session,
-    delete_single_message, branch_session_from_message,
-    update_session_title
-)
+
+# Dynamic Safe Importer para DILI na mo-crash sa ImportError
+import core.chat_manager as cm
+
+init_db = getattr(cm, "init_db")
+create_session = getattr(cm, "create_session")
+get_all_sessions = getattr(cm, "get_all_sessions")
+get_session_messages = getattr(cm, "get_session_messages")
+add_message = getattr(cm, "add_message")
+delete_session = getattr(cm, "delete_session")
+delete_single_message = getattr(cm, "delete_single_message")
+branch_session_from_message = getattr(cm, "branch_session_from_message")
+
+if hasattr(cm, "update_session_title"):
+    update_session_title = cm.update_session_title
+else:
+    def update_session_title(session_id, new_title):
+        db_path = os.path.join(os.path.dirname(__file__), "storage", "chats.db")
+        conn = sqlite3.connect(db_path, timeout=30.0)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE sessions SET title = ? WHERE id = ?", (new_title.strip(), session_id))
+            conn.commit()
+        finally:
+            conn.close()
+
+if hasattr(cm, "transfer_session_to_new"):
+    transfer_session_to_new = cm.transfer_session_to_new
+else:
+    def transfer_session_to_new(current_session_id, new_session_id):
+        db_path = os.path.join(os.path.dirname(__file__), "storage", "chats.db")
+        conn = sqlite3.connect(db_path, timeout=30.0)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT title, system_instruction FROM sessions WHERE id = ?", (current_session_id,))
+            session_row = cursor.fetchone()
+            old_title = session_row[0] if session_row else "Previous Chat"
+            sys_prompt = session_row[1] if session_row else ""
+            
+            new_title = f"⏩ Cont: {old_title[:14]}"
+            cursor.execute(
+                "INSERT INTO sessions (id, title, system_instruction, created_at) VALUES (?, ?, ?, ?)",
+                (new_session_id, new_title, sys_prompt, datetime.now())
+            )
+            summary_text = f"🔄 **[SESSION TRANSFERRED FROM: '{old_title}']**\n\nNapadayon kini nga panagsultianay gikan sa karaan nga chat session. Ang tanang context sa gi-upload nga Mendix files ug guidelines nagpabilin nga aktibo."
+            cursor.execute(
+                "INSERT INTO messages (session_id, role, content, has_attachment, created_at) VALUES (?, ?, ?, ?, ?)",
+                (new_session_id, "assistant", summary_text, 1, datetime.now())
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
 from core.mendix_parser import (
     parse_uploaded_files, parse_uploaded_file, get_project_scss_context,
     scan_mendix_folder, extract_domain_model_mermaid
@@ -29,7 +78,7 @@ init_db()
 COMPONENT_PATH = os.path.join(os.path.dirname(__file__), "core", "chat_input_component")
 custom_chat_box = components.declare_component("mendix_unified_chat", path=COMPONENT_PATH)
 
-# 3. Custom CSS (Sidebar-Aware Docking & Spacing)
+# 3. Custom CSS
 st.markdown("""
 <style>
 /* Sticky Top Controls */
@@ -79,7 +128,7 @@ div[data-testid="stExpander"] {
     display: inline-block;
 }
 
-/* 🔒 Fixed Bottom Wrapper (Sidebar Aware) */
+/* 🔒 Fixed Bottom Wrapper */
 div[data-testid="stCustomComponentV1"] {
     position: fixed !important;
     bottom: 0px !important;
@@ -126,9 +175,20 @@ if "branch_toast" in st.session_state:
 with st.sidebar:
     st.title("⚡ Mendix Copilot")
     
-    if st.button("➕ New Chat", use_container_width=True, type="primary"):
-        st.session_state.session_id = str(uuid.uuid4())
-        st.rerun()
+    col_btn1, col_btn2 = st.columns([0.48, 0.52])
+    with col_btn1:
+        if st.button("➕ New", use_container_width=True, type="primary"):
+            st.session_state.session_id = str(uuid.uuid4())
+            st.rerun()
+    with col_btn2:
+        if st.button("⏩ Continue", help="Start a new chat carrying over context & files", use_container_width=True):
+            new_id = str(uuid.uuid4())
+            transfer_session_to_new(st.session_state.session_id, new_id)
+            current_files = st.session_state.session_parsed_files.get(st.session_state.session_id, [])
+            st.session_state.session_parsed_files[new_id] = current_files
+            st.session_state.session_id = new_id
+            st.session_state.branch_toast = "⏩ Transferred context & files to New Chat!"
+            st.rerun()
         
     st.divider()
     
@@ -186,7 +246,18 @@ with st.sidebar:
     
     # Chat History List
     st.subheader("💬 Chat History")
+    search_query = st.text_input(
+        "🔎 Search chat history",
+        placeholder="Type to filter by title...",
+        key="chat_search_box"
+    )
+    
     sessions = get_all_sessions()
+    if search_query.strip():
+        _q = search_query.strip().lower()
+        sessions = [s for s in sessions if _q in s[1].lower()]
+        if not sessions:
+            st.caption("Walay chat nga natugma sa imong search.")
         
     for s_id, s_title, _ in sessions:
         col1, col2, col3 = st.columns([0.64, 0.18, 0.18])
@@ -257,7 +328,6 @@ with st.expander("🧬 Domain Model Diagram Generator (Beta — gikan sa .mpk)",
             with st.expander("📄 Raw Mermaid Code", expanded=False):
                 st.code(mermaid_code, language="mermaid")
 
-# 🌟 DYNAMIC AUTO-FIT RESIZING LIVE PREVIEW (Mo-expand base sa tinuod nga gidak-on sa sulod!)
 def render_live_preview(html_code, idx):
     st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
     
