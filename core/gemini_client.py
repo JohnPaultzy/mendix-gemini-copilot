@@ -17,7 +17,11 @@ def pil_to_bytes(pil_image):
     pil_image.save(buffer, format="JPEG", quality=85)
     return buffer.getvalue()
 
-def stream_chat_response(client, model_name, messages_history, system_instruction, attachments=None, attachment=None, context_info=""):
+def stream_chat_response(client, model_name, messages_history, system_instruction, attachments=None, attachment=None, context_info="", on_fallback_callback=None):
+    """
+    Mo-stream og tubag nga naay Seamless Failover (Kung maputol ang una,
+    i-discard ang putol nga chunks aron ang fallback model makahatag og 100% kompleto nga tubag).
+    """
     full_system_instruction = system_instruction
     if context_info:
         full_system_instruction += f"\n\n[ADDITIONAL MENDIX CONTEXT]:\n{context_info}"
@@ -67,7 +71,6 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
         temperature=0.3,
     )
 
-    # Active Models Fallback Chain (Removed deprecated 2.5-pro)
     fallback_priority = [
         "gemini-3.7-flash",
         "gemini-3.5-flash",
@@ -78,9 +81,10 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
     models_to_try = [model_name] + [m for m in fallback_priority if m != model_name]
 
     for idx, current_model in enumerate(models_to_try):
+        current_model_chunks = []
         try:
-            if idx > 0:
-                yield f"> ⚠️ *Pahibalo: Ang `{models_to_try[idx-1]}` busy/503. Awtomatikong mibalhin sa fallback: `{current_model}`...*\n\n"
+            if idx > 0 and on_fallback_callback:
+                on_fallback_callback(models_to_try[idx-1], current_model)
 
             response_stream = client.models.generate_content_stream(
                 model=current_model,
@@ -88,13 +92,13 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
                 config=config_params
             )
             
-            has_emitted = False
             for chunk in response_stream:
                 if chunk.text:
-                    has_emitted = True
-                    yield chunk.text
+                    current_model_chunks.append(chunk.text)
+                    # I-tag ang chunk uban ang model index aron dali ma-reset sa app.py kung naay fallback
+                    yield {"model_idx": idx, "text": chunk.text, "is_fresh_model": len(current_model_chunks) == 1}
             
-            if has_emitted:
+            if current_model_chunks:
                 return
 
         except Exception as e:
@@ -104,5 +108,6 @@ def stream_chat_response(client, model_name, messages_history, system_instructio
             if not is_temporary_error:
                 raise e
             
+            # Padayon sa sunod nga fallback model
             if idx == len(models_to_try) - 1:
                 raise Exception(f"Tanang models busy karon sa Google servers. Last error: {str(e)}")

@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime
 import config
 
-# Dynamic Safe Importer para DILI na mo-crash sa ImportError
+# Dynamic Safe Importer
 import core.chat_manager as cm
 
 init_db = getattr(cm, "init_db")
@@ -227,7 +227,6 @@ with st.sidebar:
     )
     st.session_state.system_prompt = system_instruction
     
-    # 📖 Reference Guide (.MD) Uploader
     st.subheader("📖 Project Guidelines (.md)")
     md_guideline = st.file_uploader(
         "Upload Custom Guidelines (.md)",
@@ -238,14 +237,12 @@ with st.sidebar:
     
     st.divider()
     
-    # Mendix Project Folder Input
     st.subheader("📂 Mendix Project Path")
     project_path = st.text_input("Local Folder Path", placeholder="e.g. C:/MendixProjects/ProcureFlow")
     
     st.divider()
     
     # Chat History List
-    st.subheader("💬 Chat History")
     search_query = st.text_input(
         "🔎 Search chat history",
         placeholder="Type to filter by title...",
@@ -329,6 +326,7 @@ with st.expander("🧬 Domain Model Diagram Generator (Beta — gikan sa .mpk)",
                 st.code(mermaid_code, language="mermaid")
 
 def render_live_preview(html_code, idx):
+    """Dynamic Auto-Height Live Preview"""
     st.caption(f"👁️ **Live Visual UI Preview #{idx+1}:**")
     
     auto_resize_script = """
@@ -505,17 +503,29 @@ if should_execute:
             with st.status(f"🧠 Mendix Copilot ({model_choice}) is analyzing & generating...", expanded=True) as status_box:
                 response_placeholder = st.empty()
                 full_response = ""
+                last_model_idx = 0
+                
+                def handle_fallback(old_m, new_m):
+                    status_box.write(f"⚠️ *Pahibalo: Ang `{old_m}` busy/503. Awtomatikong mibalhin sa fallback: `{new_m}`...*")
                 
                 try:
-                    for chunk in stream_chat_response(
+                    for chunk_obj in stream_chat_response(
                         client=client,
                         model_name=model_choice,
                         messages_history=current_messages,
                         system_instruction=st.session_state.system_prompt,
                         attachments=attachment_data,
-                        context_info=context_info
+                        context_info=context_info,
+                        on_fallback_callback=handle_fallback
                     ):
-                        full_response += chunk
+                        # Kung nibalhin og fallback model, i-reset ang partial buffer aron walay maputol nga code!
+                        if chunk_obj.get("is_fresh_model", False) and chunk_obj.get("model_idx", 0) > last_model_idx:
+                            full_response = ""
+                            last_model_idx = chunk_obj["model_idx"]
+                            
+                        chunk_text = chunk_obj["text"]
+                        full_response += chunk_text
+                        
                         live_text = re.sub(r'```html.*?```', '', full_response, flags=re.DOTALL).strip()
                         response_placeholder.markdown(live_text + "▌")
                         

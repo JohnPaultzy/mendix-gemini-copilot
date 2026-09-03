@@ -104,7 +104,7 @@
     font-size: 14px;
     resize: none;
     line-height: 1.4;
-    max-height: 100px;
+    max-height: 120px;
     min-height: 28px;
     padding-top: 3px;
   }
@@ -155,6 +155,16 @@ const thumbsBar = document.getElementById('thumbs-bar');
 const thumbsList = document.getElementById('thumbs-list');
 const imgCount = document.getElementById('img-count');
 
+// 💾 REAL-TIME DRAFT AUTO-RECOVERY
+try {
+  const savedDraft = localStorage.getItem('mendix_copilot_active_draft');
+  if (savedDraft && savedDraft.trim()) {
+    msgInput.value = savedDraft;
+    msgInput.style.height = 'auto';
+    msgInput.style.height = (msgInput.scrollHeight) + 'px';
+  }
+} catch(e) {}
+
 function notifyHeight() {
   const height = Math.max(document.body.scrollHeight + 6, 52);
   window.parent.postMessage({
@@ -182,7 +192,7 @@ function sendToStreamlit(value) {
   }, "*");
 }
 
-// 🔒 DYNAMIC SIDEBAR-AWARE VIEWPORT PINNING (Never overlaps sidebar!)
+// 🔒 DYNAMIC SIDEBAR-AWARE VIEWPORT PINNING
 function forcePinToBottom() {
   try {
     const parentDoc = window.parent.document;
@@ -259,6 +269,7 @@ function openCenteredLightbox(b64) {
   }
 }
 
+// Direct Clipboard Paste Listener
 msgInput.addEventListener('paste', function(e) {
   const items = (e.clipboardData || window.clipboardData).items;
   let hasImg = false;
@@ -290,10 +301,14 @@ msgInput.addEventListener('paste', function(e) {
   }
 });
 
+// 💾 REAL-TIME AUTO-SAVE: Kada pindot sa keyboard i-save sa localStorage
 msgInput.addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = (this.scrollHeight) + 'px';
   notifyHeight();
+  try {
+    localStorage.setItem('mendix_copilot_active_draft', this.value);
+  } catch(e) {}
 });
 
 msgInput.addEventListener('keydown', function(e) {
@@ -358,6 +373,11 @@ function submitMessage() {
   };
 
   sendToStreamlit(payload);
+
+  // Limpyohan ang draft memory human ma-send
+  try {
+    localStorage.removeItem('mendix_copilot_active_draft');
+  } catch(e) {}
 
   msgInput.value = '';
   msgInput.style.height = 'auto';
