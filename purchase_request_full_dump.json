@@ -1,0 +1,1071 @@
+{
+  "$ID": "08508c74-954a-452f-acee-889b98a06328",
+  "$Type": "DomainModels$EntityImpl",
+  "AccessRules": [
+    3,
+    {
+      "$ID": "379be5e4-0bfc-44a5-9245-51e3cdf5f270",
+      "$Type": "DomainModels$AccessRule",
+      "AllowCreate": true,
+      "AllowDelete": true,
+      "AllowedModuleRoles": [
+        1,
+        "ProcureFlow.ProcurementAdmin"
+      ],
+      "DefaultMemberAccessRights": "None",
+      "Documentation": "ProcurementAdmin_Full",
+      "MemberAccesses": [
+        3,
+        {
+          "$ID": "9717d8c8-0681-4ac2-b4c3-5d7639ae9589",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RequestNumber"
+        },
+        {
+          "$ID": "7a7fd597-d60c-4449-8202-57b0991547d9",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.ItemDescription"
+        },
+        {
+          "$ID": "2cf1e0f2-2825-4308-a6f7-d899f2c53186",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Quantity"
+        },
+        {
+          "$ID": "438d6ecb-642e-489b-b387-0e8a566627bc",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.UnitPrice"
+        },
+        {
+          "$ID": "db75a08e-1a76-46a7-a8e6-5691ade9ad64",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmount"
+        },
+        {
+          "$ID": "b6da387f-bac0-47b1-b644-d1e90edf145b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmountUSD"
+        },
+        {
+          "$ID": "a84d69aa-696a-4496-99f0-146ebad8d92e",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Currency"
+        },
+        {
+          "$ID": "f3075db8-bd8b-49f4-9e34-b6f2afb24e37",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Status"
+        },
+        {
+          "$ID": "fc18c3f6-0ca7-4152-ba7d-8be8098e6961",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Justification"
+        },
+        {
+          "$ID": "67e2c5d5-57d4-46f5-9daa-fc89d528b9cd",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RiskScore"
+        },
+        {
+          "$ID": "368c9683-5773-4ad5-921a-4850cf8312ba",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.SubmittedDate"
+        },
+        {
+          "$ID": "cebf10c8-8722-4edb-b408-8713f0e5fd0b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionDate"
+        },
+        {
+          "$ID": "76c4737a-2ea7-4bc2-ba6c-868652739a4e",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionComment"
+        },
+        {
+          "$ID": "16656982-63d5-4fdc-bba2-98291096e05c",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Vendor",
+          "Attribute": ""
+        },
+        {
+          "$ID": "91408811-85a7-4df9-a527-6cf57abd4c81",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Requester",
+          "Attribute": ""
+        },
+        {
+          "$ID": "8ef67590-2d17-4950-82dd-2e0ffb4fd1e4",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Approver",
+          "Attribute": ""
+        }
+      ],
+      "XPathConstraint": "",
+      "XPathConstraintCaption": ""
+    },
+    {
+      "$ID": "4dc413b2-b06c-4852-bb8f-312157a5d5c9",
+      "$Type": "DomainModels$AccessRule",
+      "AllowCreate": true,
+      "AllowDelete": true,
+      "AllowedModuleRoles": [
+        1,
+        "ProcureFlow.Requester"
+      ],
+      "DefaultMemberAccessRights": "None",
+      "Documentation": "Requester_EditOwnDraft",
+      "MemberAccesses": [
+        3,
+        {
+          "$ID": "8e159aed-f85c-4a81-b98e-3ebcd5fbfa10",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RequestNumber"
+        },
+        {
+          "$ID": "473ef0ff-59e0-4fa1-aaf4-92e2f1d0e53c",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.ItemDescription"
+        },
+        {
+          "$ID": "6239f52f-1480-40c4-b898-8ef726e2970f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Quantity"
+        },
+        {
+          "$ID": "0cb821cc-04e9-4e00-9d6b-a1c20d9a775a",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.UnitPrice"
+        },
+        {
+          "$ID": "9d2ab4ea-7020-4237-bb8b-7ae818ed7827",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmount"
+        },
+        {
+          "$ID": "fe784670-f545-4aeb-8466-f83293d8b90d",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmountUSD"
+        },
+        {
+          "$ID": "c9045ce6-afd9-4d92-bc5b-43679d3f7c6f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Currency"
+        },
+        {
+          "$ID": "606714ae-5fc2-4bab-afdb-4dd21c7bbf24",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Status"
+        },
+        {
+          "$ID": "148d560d-ee92-4d06-b95a-c6cacd92f9c0",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Justification"
+        },
+        {
+          "$ID": "a00b1db4-6015-4433-9f15-f23c05c6efef",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RiskScore"
+        },
+        {
+          "$ID": "1fda8b3e-de3f-4163-8253-264cc7361256",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.SubmittedDate"
+        },
+        {
+          "$ID": "318e6ba0-0b98-4923-b6bb-24c5acfec4b0",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionDate"
+        },
+        {
+          "$ID": "8a2f173d-ac0d-49d8-9ac0-d43aa8f76652",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionComment"
+        },
+        {
+          "$ID": "7367d393-540a-4f89-8f6a-e30520a2207b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Vendor",
+          "Attribute": ""
+        },
+        {
+          "$ID": "48e11fe2-0877-4d5f-a0a2-868e9a1a6517",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Requester",
+          "Attribute": ""
+        },
+        {
+          "$ID": "c6fa5484-40ea-4885-a0d4-373c70d55242",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Approver",
+          "Attribute": ""
+        }
+      ],
+      "XPathConstraint": "[ProcureFlow.PurchaseRequest_Requester='[%CurrentUser%]'][Status = 'Draft']",
+      "XPathConstraintCaption": "Requester_EditOwnDraft"
+    },
+    {
+      "$ID": "0e9838d2-36fa-4f4e-81ad-9811982da355",
+      "$Type": "DomainModels$AccessRule",
+      "AllowCreate": false,
+      "AllowDelete": false,
+      "AllowedModuleRoles": [
+        1,
+        "ProcureFlow.Requester"
+      ],
+      "DefaultMemberAccessRights": "None",
+      "Documentation": "Requester_ReadOwnAll",
+      "MemberAccesses": [
+        3,
+        {
+          "$ID": "151ee515-bf6c-45ef-b0b7-3367e6d95884",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RequestNumber"
+        },
+        {
+          "$ID": "46ef9184-d718-41f2-a65d-add3f4675724",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.ItemDescription"
+        },
+        {
+          "$ID": "936c1291-ce0e-4eb0-b87a-df661499c787",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Quantity"
+        },
+        {
+          "$ID": "5edc73ec-5a02-4e08-a7e0-5ae9b0566daf",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.UnitPrice"
+        },
+        {
+          "$ID": "78aacacf-76fa-4ed1-a09b-0b863719205c",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmount"
+        },
+        {
+          "$ID": "ae4e7b66-3de1-447e-a401-d6d4fda4301f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmountUSD"
+        },
+        {
+          "$ID": "dd34039c-c19f-4f21-9b52-b1342b6f216a",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Currency"
+        },
+        {
+          "$ID": "fe407170-d328-4f98-899d-28a42ab5b040",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Status"
+        },
+        {
+          "$ID": "a2bd6baf-4392-43ef-9ccc-402771972192",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Justification"
+        },
+        {
+          "$ID": "0e7952e9-823e-4aca-9d0c-0d56e4939a16",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RiskScore"
+        },
+        {
+          "$ID": "7a1715c8-f93f-4b7d-8f2e-f9b509f339ca",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.SubmittedDate"
+        },
+        {
+          "$ID": "881fe2a0-f252-45ac-872e-892b9c046a6f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionDate"
+        },
+        {
+          "$ID": "4262d1dc-4ef2-41cc-adeb-4a9db8263695",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionComment"
+        },
+        {
+          "$ID": "ccc3ff10-18c8-40fa-a68b-37cddcccf916",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Vendor",
+          "Attribute": ""
+        },
+        {
+          "$ID": "73d7789d-a801-438a-82e1-ca3429ffbfdc",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Requester",
+          "Attribute": ""
+        },
+        {
+          "$ID": "4ac376c7-c2aa-4f1a-85e1-98787046bd39",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Approver",
+          "Attribute": ""
+        }
+      ],
+      "XPathConstraint": "[ProcureFlow.PurchaseRequest_Requester='[%CurrentUser%]']",
+      "XPathConstraintCaption": "Requester_ReadOwnAll"
+    },
+    {
+      "$ID": "697f6d5c-300d-4019-b730-ed3cf178f258",
+      "$Type": "DomainModels$AccessRule",
+      "AllowCreate": false,
+      "AllowDelete": false,
+      "AllowedModuleRoles": [
+        1,
+        "ProcureFlow.Approver"
+      ],
+      "DefaultMemberAccessRights": "None",
+      "Documentation": "Approver_PendingQueue",
+      "MemberAccesses": [
+        3,
+        {
+          "$ID": "dcc27b9b-a652-4530-9630-1b0e0e3c2521",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RequestNumber"
+        },
+        {
+          "$ID": "87058664-0442-4d33-b9a3-40dfeae8f814",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.ItemDescription"
+        },
+        {
+          "$ID": "6ea7880d-b5e4-4dcb-a733-5126cb4fb890",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Quantity"
+        },
+        {
+          "$ID": "50d4c04a-ea80-483e-a905-9ea640cc60d2",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.UnitPrice"
+        },
+        {
+          "$ID": "36ae4d1f-a625-4472-bcd1-fefd58b67d2d",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmount"
+        },
+        {
+          "$ID": "41d89b26-31d7-4cd8-8bb1-2b0cb51131a7",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmountUSD"
+        },
+        {
+          "$ID": "8ba74d6e-cca3-4f2e-8863-b3ab5394c294",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Currency"
+        },
+        {
+          "$ID": "cb4e219e-8c03-4b94-b463-1596129adcfc",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Status"
+        },
+        {
+          "$ID": "19aa86cd-e013-437e-9114-b021d5f7e427",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Justification"
+        },
+        {
+          "$ID": "31528f3c-1733-4630-9f01-fceab3da394f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RiskScore"
+        },
+        {
+          "$ID": "a45c4bd7-dbdc-4dce-889d-ad22b4c53bc1",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.SubmittedDate"
+        },
+        {
+          "$ID": "ccb7230a-42c1-4b1e-9929-d9264a360875",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionDate"
+        },
+        {
+          "$ID": "79cd1c47-f332-45df-9152-8e68c65fb008",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionComment"
+        },
+        {
+          "$ID": "a936c133-dd62-495c-bb1e-f82652e8491f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Vendor",
+          "Attribute": ""
+        },
+        {
+          "$ID": "3dabf293-2003-4d0a-9644-f60591829742",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Requester",
+          "Attribute": ""
+        },
+        {
+          "$ID": "2a98bb57-68d5-4c71-be51-7b8bbfb93666",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Approver",
+          "Attribute": ""
+        }
+      ],
+      "XPathConstraint": "[ProcureFlow.PurchaseRequest_Approver='[%CurrentUser%]'][Status = 'PendingApproval']",
+      "XPathConstraintCaption": "Approver_PendingQueue"
+    },
+    {
+      "$ID": "c8e04d96-8af0-4ee6-810b-cfb7f0ad3761",
+      "$Type": "DomainModels$AccessRule",
+      "AllowCreate": false,
+      "AllowDelete": false,
+      "AllowedModuleRoles": [
+        1,
+        "ProcureFlow.Approver"
+      ],
+      "DefaultMemberAccessRights": "None",
+      "Documentation": "Approver_History",
+      "MemberAccesses": [
+        3,
+        {
+          "$ID": "4c933794-d9ac-49d3-b490-b45bee37826a",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RequestNumber"
+        },
+        {
+          "$ID": "c52bb1e0-9aaa-4324-9328-4ae1876bde17",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.ItemDescription"
+        },
+        {
+          "$ID": "8ba1f6b0-df70-4985-9f23-6ac0fc01097b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Quantity"
+        },
+        {
+          "$ID": "761995b2-7527-45b3-8c37-8fd3a54c9f26",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.UnitPrice"
+        },
+        {
+          "$ID": "cef187ba-1559-4c82-927d-cb52a0723e43",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmount"
+        },
+        {
+          "$ID": "a65929db-261d-4a46-a364-61a2e1eacec0",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmountUSD"
+        },
+        {
+          "$ID": "e3fd9a9e-125c-43b7-879c-8eaf31c4396a",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Currency"
+        },
+        {
+          "$ID": "e3de1dba-eb07-4e24-9f72-a930facf73df",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Status"
+        },
+        {
+          "$ID": "6344e51e-ad40-47d6-80b8-458a8c426c77",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Justification"
+        },
+        {
+          "$ID": "c6c20432-6500-4755-98f5-c7a7d07f471e",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RiskScore"
+        },
+        {
+          "$ID": "b3b9eba8-5256-49f7-bd15-40ef9f0ebe6a",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.SubmittedDate"
+        },
+        {
+          "$ID": "67e4a61a-01ed-42ad-9cc8-3f9aab3c780f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionDate"
+        },
+        {
+          "$ID": "13c45205-7c30-4c79-b89c-60d36018820d",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionComment"
+        },
+        {
+          "$ID": "4aa9753c-6f99-4f85-bda3-1ff94a283064",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Vendor",
+          "Attribute": ""
+        },
+        {
+          "$ID": "d21fb73d-b9cf-45f8-abdf-ffd452fa4224",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Requester",
+          "Attribute": ""
+        },
+        {
+          "$ID": "11cef648-b62e-497c-b8e6-f8656500e44b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadOnly",
+          "Association": "ProcureFlow.PurchaseRequest_Approver",
+          "Attribute": ""
+        }
+      ],
+      "XPathConstraint": "[ProcureFlow.PurchaseRequest_Approver='[%CurrentUser%]']",
+      "XPathConstraintCaption": "Approver_History"
+    },
+    {
+      "$ID": "3ebd4417-0827-4a32-8cc3-3526788ad53a",
+      "$Type": "DomainModels$AccessRule",
+      "AllowCreate": true,
+      "AllowDelete": true,
+      "AllowedModuleRoles": [
+        1,
+        "ProcureFlow.Admin"
+      ],
+      "DefaultMemberAccessRights": "ReadWrite",
+      "Documentation": "",
+      "MemberAccesses": [
+        3,
+        {
+          "$ID": "f48129ab-5ed3-42c5-855e-9f218dfc1791",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RequestNumber"
+        },
+        {
+          "$ID": "95160252-3adf-419f-aed7-fcd69e2e029b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.ItemDescription"
+        },
+        {
+          "$ID": "4b3f2ccb-48e3-4adb-9d5a-f07ec12fc20f",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Quantity"
+        },
+        {
+          "$ID": "053b2421-540d-49a3-8992-04cde3ee64ce",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.UnitPrice"
+        },
+        {
+          "$ID": "fbd1b709-07e4-4fa1-b36f-5462f7f33066",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmount"
+        },
+        {
+          "$ID": "8bd18249-efac-4f0d-869d-9ff4ce7fa9df",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.TotalAmountUSD"
+        },
+        {
+          "$ID": "fb62c913-3a5d-43fa-9d14-19c60d5438f6",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Currency"
+        },
+        {
+          "$ID": "2ccf0c61-b9d1-4867-ad7f-fdbb06cc0447",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Status"
+        },
+        {
+          "$ID": "5038eb08-a574-4590-9b80-af6e4a9d2e47",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.Justification"
+        },
+        {
+          "$ID": "0748b517-5091-4066-b7b1-9566fe75b65d",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.RiskScore"
+        },
+        {
+          "$ID": "957e61ed-412c-455c-aa9c-2cea47ab0d2b",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.SubmittedDate"
+        },
+        {
+          "$ID": "d21bc696-9519-4ba0-b8f1-64a908af2ba0",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionDate"
+        },
+        {
+          "$ID": "fe6315dc-aabc-47d0-8a42-2c18a12ab660",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "",
+          "Attribute": "ProcureFlow.PurchaseRequest.DecisionComment"
+        },
+        {
+          "$ID": "dee1d8e8-636c-4674-97c5-204a4530564d",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Vendor",
+          "Attribute": ""
+        },
+        {
+          "$ID": "1ceef127-e3dd-496f-858a-e8e8977bd6e4",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Requester",
+          "Attribute": ""
+        },
+        {
+          "$ID": "c2254ed1-b67f-4902-8896-285937902e15",
+          "$Type": "DomainModels$MemberAccess",
+          "AccessRights": "ReadWrite",
+          "Association": "ProcureFlow.PurchaseRequest_Approver",
+          "Attribute": ""
+        }
+      ],
+      "XPathConstraint": "",
+      "XPathConstraintCaption": ""
+    }
+  ],
+  "Attributes": [
+    3,
+    {
+      "$ID": "9cd44b8c-b5c0-4b05-a758-9ed10d2c8c43",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "5dab2b37-e2fe-44aa-b14d-8317fb1a4413",
+      "Name": "RequestNumber",
+      "NewType": {
+        "$ID": "642f582a-08fd-4e74-ab49-bb8a3c09dd5f",
+        "$Type": "DomainModels$StringAttributeType",
+        "Length": 20
+      },
+      "Value": {
+        "$ID": "3fe32eec-8f55-47bc-b70a-89cf109fbf5e",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    },
+    {
+      "$ID": "33f539da-2635-41bb-a187-c486bfb946ce",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "238aaa7c-2d4d-48c6-84c6-270c38805ff0",
+      "Name": "ItemDescription",
+      "NewType": {
+        "$ID": "9e22b8e2-91bc-42c3-b7da-c04a98000c49",
+        "$Type": "DomainModels$StringAttributeType",
+        "Length": 200
+      },
+      "Value": {
+        "$ID": "3b7ee58b-c3ba-4aba-8000-1c412004764d",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    },
+    {
+      "$ID": "26b56db6-5787-45d1-9c8d-5bd1c50affd5",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "cffba1a1-cdb5-4fd9-a5a5-ffa4b8cc0cdf",
+      "Name": "Quantity",
+      "NewType": {
+        "$ID": "04bbbbc7-0113-4105-9074-40ce348f3474",
+        "$Type": "DomainModels$IntegerAttributeType"
+      },
+      "Value": {
+        "$ID": "c75fa56a-aade-4e96-9e4f-7138b2c8b363",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": "0"
+      }
+    },
+    {
+      "$ID": "2965b2ab-44f1-4832-97fa-c6784880e2a2",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "e1a68f41-1b4e-4300-a374-7f38bcd4c6c6",
+      "Name": "UnitPrice",
+      "NewType": {
+        "$ID": "e68dbea6-f607-4b44-8d91-9dbe7f2bdc75",
+        "$Type": "DomainModels$DecimalAttributeType"
+      },
+      "Value": {
+        "$ID": "be53bf5a-83f4-4160-8f24-6377f35472a2",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": "0"
+      }
+    },
+    {
+      "$ID": "b6cf3af2-d1ac-443f-a8e0-cd55b9efc9c5",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "d7e5a462-44b4-43fa-bffb-f52387c6de10",
+      "Name": "TotalAmount",
+      "NewType": {
+        "$ID": "2230f51a-d9b5-4112-9365-30d98a3cc5ff",
+        "$Type": "DomainModels$DecimalAttributeType"
+      },
+      "Value": {
+        "$ID": "e52460b0-6cf9-484d-b90c-2aaaaba1e2ae",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": "0"
+      }
+    },
+    {
+      "$ID": "c814e4e2-0509-43cb-bb2c-05662368120c",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "d7327faa-89b6-4dca-afbe-ee6934842b92",
+      "Name": "TotalAmountUSD",
+      "NewType": {
+        "$ID": "8eeff68d-63be-42b5-bc5b-3e43d6868cbd",
+        "$Type": "DomainModels$DecimalAttributeType"
+      },
+      "Value": {
+        "$ID": "1c3f4b8d-8ead-45bd-a91f-7ad0861405ba",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": "0"
+      }
+    },
+    {
+      "$ID": "89279c8e-432e-4606-8d53-4edad1590195",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "a04c8a7c-876b-4130-a319-ed78e43f95f5",
+      "Name": "Currency",
+      "NewType": {
+        "$ID": "e12b60eb-4a2b-403b-ac34-09dc5977d817",
+        "$Type": "DomainModels$EnumerationAttributeType",
+        "Enumeration": "ProcureFlow.CurrencyEnum"
+      },
+      "Value": {
+        "$ID": "c75f3a55-6fa1-4509-b618-9c8982ab6ad2",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": "USD"
+      }
+    },
+    {
+      "$ID": "8483b048-e82e-4e82-8893-55b5221cf4f0",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "15a21fa1-f10e-4ff1-b277-de4eb2d75c69",
+      "Name": "Status",
+      "NewType": {
+        "$ID": "43d54edc-9182-4bdf-ae1f-fac0b2fbee26",
+        "$Type": "DomainModels$EnumerationAttributeType",
+        "Enumeration": "ProcureFlow.RequestStatusEnum"
+      },
+      "Value": {
+        "$ID": "ba77d8d0-2386-4f19-a61a-3b2499327bb0",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    },
+    {
+      "$ID": "4474950f-17bc-44df-86b3-000967fc3b73",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "7ff68a82-30ca-4db9-83d7-4e3afc160552",
+      "Name": "Justification",
+      "NewType": {
+        "$ID": "149c5185-44ed-407f-8e13-46aaaf7fdaf0",
+        "$Type": "DomainModels$StringAttributeType",
+        "Length": 1000
+      },
+      "Value": {
+        "$ID": "1d1674f4-2f3e-45ab-b161-97dc45772162",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    },
+    {
+      "$ID": "3e350ba5-14cc-4f1a-a53f-2e13c976a6b6",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "c45e5e8c-abcf-487d-b4c2-3fc93703b039",
+      "Name": "RiskScore",
+      "NewType": {
+        "$ID": "a47d105f-45c0-41e1-b04c-9805b41e6b84",
+        "$Type": "DomainModels$IntegerAttributeType"
+      },
+      "Value": {
+        "$ID": "81c2d96c-9862-4928-9f54-1b512a1534d4",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": "0"
+      }
+    },
+    {
+      "$ID": "1f8866ea-11ab-4814-9090-07177d291d36",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "a1c194ee-e3f2-46dd-8640-ff8ab1cfc1ff",
+      "Name": "SubmittedDate",
+      "NewType": {
+        "$ID": "cd58d8e1-916a-4ab5-8f6c-433d72656347",
+        "$Type": "DomainModels$DateTimeAttributeType",
+        "LocalizeDate": true
+      },
+      "Value": {
+        "$ID": "a829510e-ab1f-4775-b363-077b3f47a7da",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    },
+    {
+      "$ID": "52ff259a-6c0e-42f2-a93f-98bd6c59f140",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "b7156819-2b74-4aee-ad40-2987a7140523",
+      "Name": "DecisionDate",
+      "NewType": {
+        "$ID": "b081da87-d73e-42a9-923d-56176568524f",
+        "$Type": "DomainModels$DateTimeAttributeType",
+        "LocalizeDate": true
+      },
+      "Value": {
+        "$ID": "f86e34f4-ce11-46c9-9a3f-4f1f2b6c0af6",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    },
+    {
+      "$ID": "8e46dbd3-109c-4245-a65d-baf3db1ed919",
+      "$Type": "DomainModels$Attribute",
+      "Documentation": "",
+      "ExportLevel": "Hidden",
+      "GUID": "3550f61d-36e5-4f9e-b16c-b58cdc18f808",
+      "Name": "DecisionComment",
+      "NewType": {
+        "$ID": "e821fc83-8d0c-4172-9817-3e06e497a975",
+        "$Type": "DomainModels$StringAttributeType",
+        "Length": 0
+      },
+      "Value": {
+        "$ID": "a152b76b-dd73-44d2-9ee6-7dd7541030b9",
+        "$Type": "DomainModels$StoredValue",
+        "DefaultValue": ""
+      }
+    }
+  ],
+  "Documentation": "",
+  "Events": [
+    3
+  ],
+  "ExportLevel": "Hidden",
+  "GUID": "7c33dc54-608f-4480-87f5-ddd529951cab",
+  "Image": "",
+  "ImageData": "<bytes len=0>",
+  "Indexes": [
+    3,
+    {
+      "$ID": "b113e2b5-0d42-44b3-9776-177244bb16b2",
+      "$Type": "DomainModels$EntityIndex",
+      "Attributes": [
+        2,
+        {
+          "$ID": "446463b2-ba4c-4873-97d7-88f650fe66c4",
+          "$Type": "DomainModels$IndexedAttribute",
+          "Ascending": true,
+          "AttributePointer": "9cd44b8c-b5c0-4b05-a758-9ed10d2c8c43",
+          "Type": "Normal"
+        }
+      ],
+      "GUID": "a83775b2-e6be-478a-b4e3-e4004043cb1d",
+      "IncludeInOffline": false
+    },
+    {
+      "$ID": "de2662eb-29fe-408e-b656-2a8d78789a32",
+      "$Type": "DomainModels$EntityIndex",
+      "Attributes": [
+        2,
+        {
+          "$ID": "7199aa60-7642-457c-a954-444d81caf0b9",
+          "$Type": "DomainModels$IndexedAttribute",
+          "Ascending": true,
+          "AttributePointer": "1f8866ea-11ab-4814-9090-07177d291d36",
+          "Type": "Normal"
+        }
+      ],
+      "GUID": "ff120743-7be1-43b7-b194-f6234938ad25",
+      "IncludeInOffline": false
+    }
+  ],
+  "Location": "230;80",
+  "MaybeGeneralization": {
+    "$ID": "62599e1f-8d37-41a4-b70e-183232dede35",
+    "$Type": "DomainModels$NoGeneralization",
+    "HasChangedByAttr": false,
+    "HasChangedDateAttr": false,
+    "HasCreatedDateAttr": true,
+    "HasOwnerAttr": false,
+    "Persistable": true
+  },
+  "Name": "PurchaseRequest",
+  "Source": null,
+  "ValidationRules": [
+    3
+  ]
+}
