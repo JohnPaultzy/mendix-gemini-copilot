@@ -152,8 +152,26 @@ div[data-testid="stExpander"] {
 """, unsafe_allow_html=True)
 
 # 4. Session State Setup
+def _set_active_session(new_id):
+    """Sets the active chat AND mirrors it into the URL query params, so the
+    correct chat can be restored even if the server-side session_state gets
+    wiped (e.g. after a laptop sleep breaks the WebSocket connection and
+    Streamlit silently starts a fresh session)."""
+    st.session_state.session_id = new_id
+    try:
+        st.query_params["chat"] = new_id
+    except Exception:
+        pass  # very old Streamlit without query_params — chat still works, just won't survive a reconnect
+
 if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
+    _restored_id = None
+    try:
+        _candidate = st.query_params.get("chat")
+        if _candidate and get_session_messages(_candidate):
+            _restored_id = _candidate
+    except Exception:
+        _restored_id = None
+    _set_active_session(_restored_id or str(uuid.uuid4()))
 
 if "last_processed_ts" not in st.session_state:
     st.session_state.last_processed_ts = 0
@@ -348,7 +366,7 @@ with st.sidebar:
     col_btn1, col_btn2 = st.columns([0.48, 0.52])
     with col_btn1:
         if st.button("➕ New", use_container_width=True, type="primary"):
-            st.session_state.session_id = str(uuid.uuid4())
+            _set_active_session(str(uuid.uuid4()))
             st.rerun()
     with col_btn2:
         if st.button("⏩ Continue", help="Start a new chat carrying over context & files", use_container_width=True):
@@ -356,7 +374,7 @@ with st.sidebar:
             transfer_session_to_new(st.session_state.session_id, new_id)
             current_files = st.session_state.session_parsed_files.get(st.session_state.session_id, [])
             st.session_state.session_parsed_files[new_id] = current_files
-            st.session_state.session_id = new_id
+            _set_active_session(new_id)
             st.session_state.branch_toast = "⏩ Transferred context & files to New Chat!"
             st.rerun()
         
@@ -479,7 +497,7 @@ with st.sidebar:
             is_active = (s_id == st.session_state.session_id)
             label = f"👉 {s_title}" if is_active else f"📄 {s_title}"
             if st.button(label, key=f"btn_{s_id}", use_container_width=True, disabled=is_active):
-                st.session_state.session_id = s_id
+                _set_active_session(s_id)
                 st.rerun()
         with col2:
             with st.popover("✏️", help="Rename Chat"):
@@ -494,7 +512,7 @@ with st.sidebar:
                 if st.button("Confirm", key=f"confirm_del_{s_id}", type="primary", use_container_width=True):
                     delete_session(s_id)
                     if st.session_state.session_id == s_id:
-                        st.session_state.session_id = str(uuid.uuid4())
+                        _set_active_session(str(uuid.uuid4()))
                     st.rerun()
 
 # 6. STICKY TOP CONTROLS (Main Area - With Pinned Separator & Exact Spacing)
@@ -601,7 +619,7 @@ for msg in messages:
                 if st.button("🔀 Branch from here", key=f"branch_{msg_id}", use_container_width=True):
                     new_branch_id = str(uuid.uuid4())
                     branch_session_from_message(st.session_state.session_id, msg_id, new_branch_id)
-                    st.session_state.session_id = new_branch_id
+                    _set_active_session(new_branch_id)
                     st.session_state.branch_toast = "🔀 New branched conversation created successfully!"
                     st.rerun()
 

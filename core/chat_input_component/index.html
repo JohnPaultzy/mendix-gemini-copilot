@@ -246,21 +246,31 @@ function openCenteredLightbox(b64) {
       <img id="mendix-lightbox-img-element" src="" style="max-width: 85vw; max-height: 82vh; border-radius: 10px; box-shadow: 0 12px 48px rgba(0, 0, 0, 0.85); border: 2px solid #38bdf8; object-fit: contain; background: #020617; cursor: default;">
     `;
     parentDoc.body.appendChild(modal);
-
-    modal.onclick = function() { modal.style.display = 'none'; };
-
-    const closeBtn = parentDoc.getElementById('mendix-lightbox-close-btn');
-    if (closeBtn) {
-      closeBtn.onclick = function(e) {
-        e.stopPropagation();
-        modal.style.display = 'none';
-      };
-    }
-
-    parentDoc.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') modal.style.display = 'none';
-    });
   }
+
+  // Always (re)bind fresh handlers, even if the modal element already existed
+  // from a previous component instance. This fixes the close button silently
+  // going dead after this component's iframe remounts (e.g. a Streamlit
+  // rerun that changes the chat's key) — without this, only the handlers
+  // from the FIRST iframe instance ever get attached, and those can become
+  // unresponsive once that original iframe is torn down.
+  modal.onclick = function() { modal.style.display = 'none'; };
+
+  const closeBtn = parentDoc.getElementById('mendix-lightbox-close-btn');
+  if (closeBtn) {
+    closeBtn.onclick = function(e) {
+      e.stopPropagation();
+      modal.style.display = 'none';
+    };
+  }
+
+  if (modal._escHandler) {
+    parentDoc.removeEventListener('keydown', modal._escHandler);
+  }
+  modal._escHandler = function(e) {
+    if (e.key === 'Escape') modal.style.display = 'none';
+  };
+  parentDoc.addEventListener('keydown', modal._escHandler);
 
   const imgElem = parentDoc.getElementById('mendix-lightbox-img-element');
   if (imgElem) {
