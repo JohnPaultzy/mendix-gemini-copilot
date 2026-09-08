@@ -17,6 +17,46 @@ def pil_to_bytes(pil_image):
     pil_image.save(buffer, format="JPEG", quality=85)
     return buffer.getvalue()
 
+def summarize_conversation_for_branch(client, model_name, messages_history):
+    """
+    One-off, non-streaming call that condenses a conversation into a compact
+    briefing — used when branching to a new chat, so the new session carries
+    forward the KNOWLEDGE from the old conversation without paying the token
+    cost of repeating the full verbatim history every time.
+    Returns an empty string on any failure (caller should handle that case).
+    """
+    if not client or not messages_history:
+        return ""
+
+    convo_text = "\n\n".join(
+        f"{'User' if m.get('role') == 'user' else 'Assistant'}: {m.get('content', '')}"
+        for m in messages_history
+    )
+    # Keep the summarization prompt itself token-bounded even for very long chats
+    if len(convo_text) > 60000:
+        convo_text = convo_text[-60000:]
+
+    prompt = (
+        "Summarize the following Mendix development conversation into a concise, "
+        "factual briefing for a NEW chat session that will continue this work. "
+        "Focus on: what was being built or fixed, key decisions made, important "
+        "technical details (entity names, module names, file names, specific bugs "
+        "and their root causes/fixes), and what the next step should be. "
+        "Keep it under 400 words, plain prose or short bullet points, no preamble.\n\n"
+        f"--- CONVERSATION ---\n{convo_text}\n--- END CONVERSATION ---"
+    )
+
+    try:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
+            config=types.GenerateContentConfig(temperature=0.2),
+        )
+        return response.text.strip() if response and response.text else ""
+    except Exception:
+        return ""
+
+
 def stream_chat_response(client, model_name, messages_history, system_instruction, attachments=None, attachment=None, context_info="", on_fallback_callback=None):
     """
     Mo-stream og tubag nga naay Seamless Failover (Kung maputol ang una,

@@ -18,6 +18,7 @@ add_message = getattr(cm, "add_message")
 delete_session = getattr(cm, "delete_session")
 delete_single_message = getattr(cm, "delete_single_message")
 branch_session_from_message = getattr(cm, "branch_session_from_message")
+branch_session_with_summary = getattr(cm, "branch_session_with_summary")
 
 if hasattr(cm, "update_session_title"):
     update_session_title = cm.update_session_title
@@ -64,7 +65,7 @@ from core.mendix_parser import (
     scan_mendix_folder, generate_domain_model, compute_domain_model_signature,
     build_relevant_domain_context
 )
-from core.gemini_client import get_gemini_client, stream_chat_response
+from core.gemini_client import get_gemini_client, stream_chat_response, summarize_conversation_for_branch
 
 # 1. Page Configuration
 st.set_page_config(
@@ -618,9 +619,28 @@ for msg in messages:
             with btn_col2:
                 if st.button("🔀 Branch from here", key=f"branch_{msg_id}", use_container_width=True):
                     new_branch_id = str(uuid.uuid4())
-                    branch_session_from_message(st.session_state.session_id, msg_id, new_branch_id)
+
+                    with st.spinner("🧠 Summarizing this conversation so the new branch starts light but stays in context... (a few seconds)"):
+                        history_upto = [m for m in get_session_messages(st.session_state.session_id) if m["id"] <= msg_id]
+                        _branch_client = get_gemini_client()
+                        summary_text = summarize_conversation_for_branch(_branch_client, model_choice, history_upto)
+
+                    branch_session_with_summary(st.session_state.session_id, msg_id, new_branch_id, summary_text)
+
+                    # Carry over parsed attachment content (same mechanism the "Continue" button uses —
+                    # file_uploader widgets can't be programmatically populated, but their already-extracted
+                    # content can be handed straight to the new session).
+                    current_files = st.session_state.session_parsed_files.get(st.session_state.session_id, [])
+                    st.session_state.session_parsed_files[new_branch_id] = current_files
+
+                    # Carry over Inspection Scope (this widget's key is session-scoped, so pre-seed the new
+                    # session's key before its radio is first instantiated).
+                    st.session_state[f"scope_{new_branch_id}"] = st.session_state.get(
+                        f"scope_{st.session_state.session_id}", "Single Microflow Focus"
+                    )
+
                     _set_active_session(new_branch_id)
-                    st.session_state.branch_toast = "🔀 New branched conversation created successfully!"
+                    st.session_state.branch_toast = "🔀 Branched with a fresh summary — settings & files carried over!"
                     st.rerun()
 
 needs_resume = (len(messages) > 0 and messages[-1]["role"] == "user")

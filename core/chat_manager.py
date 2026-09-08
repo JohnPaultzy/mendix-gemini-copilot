@@ -132,6 +132,48 @@ def delete_session(session_id):
     finally:
         conn.close()
 
+def branch_session_with_summary(current_session_id, message_id, new_session_id, summary_text):
+    """
+    Lightweight branch: creates a new session that starts with a compact
+    AI-generated SUMMARY of the prior conversation (up to message_id) instead
+    of copying every message verbatim — keeps the new chat token-light even
+    when branching from a very long conversation.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT title, system_instruction FROM sessions WHERE id = ?", (current_session_id,))
+        session_row = cursor.fetchone()
+        old_title = session_row[0] if session_row else "Branched Chat"
+        sys_prompt = session_row[1] if session_row else ""
+
+        new_title = f"🔀 Branch: {old_title[:14]}"
+        cursor.execute(
+            "INSERT INTO sessions (id, title, system_instruction, created_at) VALUES (?, ?, ?, ?)",
+            (new_session_id, new_title, sys_prompt, datetime.now())
+        )
+
+        if summary_text:
+            summary_body = f"**Summary of the prior conversation:**\n{summary_text}"
+        else:
+            summary_body = "(Summary unavailable — please briefly restate what you'd like to continue working on.)"
+
+        summary_msg = (
+            f"🔀 **[BRANCHED FROM: '{old_title}']**\n\n"
+            f"{summary_body}\n\n"
+            "This new chat continues from that point — the full prior transcript isn't "
+            "repeated here to keep this chat lightweight, but the summary above should "
+            "be enough context to continue."
+        )
+        cursor.execute(
+            "INSERT INTO messages (session_id, role, content, has_attachment, created_at) VALUES (?, ?, ?, ?, ?)",
+            (new_session_id, "assistant", summary_msg, 0, datetime.now())
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def branch_session_from_message(current_session_id, message_id, new_session_id):
     conn = get_db_connection()
     try:
