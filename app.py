@@ -180,6 +180,13 @@ if "last_processed_ts" not in st.session_state:
 if "session_parsed_files" not in st.session_state:
     st.session_state.session_parsed_files = {}
 
+# Fetch the full message history ONCE per rerun and reuse it everywhere below
+# (token estimate, pagination, resume-check) — previously this was queried
+# twice unconditionally on every single rerun, which for very large chats
+# (hundreds of messages with large text blobs) meant doubling an already
+# heavy DB read on every interaction, including just opening/switching chats.
+messages = get_session_messages(st.session_state.session_id)
+
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = config.SYSTEM_PROMPT_PRESETS["🛡️ Senior Mendix Architect (Strict Best Practices & SOD)"]
 
@@ -396,8 +403,7 @@ with st.sidebar:
         index=default_model_idx
     )
 
-    _current_msgs_for_est = get_session_messages(st.session_state.session_id)
-    _total_chars = sum(len(m["content"]) for m in _current_msgs_for_est)
+    _total_chars = sum(len(m["content"]) for m in messages)
     _approx_tokens = _total_chars // 4
     st.caption(f"📊 ~{_approx_tokens:,} tokens estimate (this chat)")
 
@@ -588,13 +594,21 @@ def render_live_preview(html_code, idx):
     with st.expander(f"💻 View HTML & CSS Code (#{idx+1})", expanded=False):
         st.code(html_code, language="html")
 
-# 7. RENDER CHAT MESSAGES
-messages = get_session_messages(st.session_state.session_id)
-for msg in messages:
+# 7. RENDER CHAT MESSAGES (paginated)
+# Very long chats were causing slow or occasionally hanging reruns, since
+# Streamlit rebuilds every message's widgets (expanders, buttons) on EVERY
+# interaction — hundreds of messages meant hundreds of expanders being
+# recreated each time. Only the most recent messages are rendered as full
+# widgets by default now; older ones stay collapsed behind an expander and
+# are still fully present in the database AND still sent to the AI for
+# context — this only reduces what gets drawn on screen, not what the model sees.
+PAGINATION_THRESHOLD = 15
+
+def render_message_bubble(msg):
     msg_id = msg["id"]
     role = msg["role"]
     content = msg["content"]
-    
+
     with st.chat_message(role):
         clean_text_display = re.sub(r'```html.*?```', '', content, flags=re.DOTALL).strip()
         if clean_text_display:
@@ -642,6 +656,18 @@ for msg in messages:
                     _set_active_session(new_branch_id)
                     st.session_state.branch_toast = "🔀 Branched with a fresh summary — settings & files carried over!"
                     st.rerun()
+
+if len(messages) > PAGINATION_THRESHOLD:
+    older_messages = messages[:-PAGINATION_THRESHOLD]
+    recent_messages = messages[-PAGINATION_THRESHOLD:]
+    with st.expander(f"📜 Show earlier messages ({len(older_messages)} more)", expanded=False):
+        for _older_msg in older_messages:
+            render_message_bubble(_older_msg)
+else:
+    recent_messages = messages
+
+for msg in recent_messages:
+    render_message_bubble(msg)
 
 needs_resume = (len(messages) > 0 and messages[-1]["role"] == "user")
 if needs_resume:

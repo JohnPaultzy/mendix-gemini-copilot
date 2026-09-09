@@ -23,7 +23,12 @@ def summarize_conversation_for_branch(client, model_name, messages_history):
     briefing — used when branching to a new chat, so the new session carries
     forward the KNOWLEDGE from the old conversation without paying the token
     cost of repeating the full verbatim history every time.
-    Returns an empty string on any failure (caller should handle that case).
+
+    Tries the requested model first, then falls back through the same model
+    priority list stream_chat_response uses if that fails (mirrors the main
+    chat's resilience instead of giving up on the first error). Any failure
+    is logged to the console so the real cause is visible, and returns an
+    empty string only if every attempt fails (caller handles that case).
     """
     if not client or not messages_history:
         return ""
@@ -46,15 +51,31 @@ def summarize_conversation_for_branch(client, model_name, messages_history):
         f"--- CONVERSATION ---\n{convo_text}\n--- END CONVERSATION ---"
     )
 
-    try:
-        response = client.models.generate_content(
-            model=model_name,
-            contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
-            config=types.GenerateContentConfig(temperature=0.2),
-        )
-        return response.text.strip() if response and response.text else ""
-    except Exception:
-        return ""
+    fallback_priority = [
+        "gemini-3.7-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash"
+    ]
+    models_to_try = [model_name] + [m for m in fallback_priority if m != model_name]
+
+    for current_model in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=current_model,
+                contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
+                config=types.GenerateContentConfig(temperature=0.2),
+            )
+            if response and response.text:
+                return response.text.strip()
+            print(f"[Branch Summary] Model '{current_model}' returned an empty response — trying next model.")
+        except Exception as e:
+            print(f"[Branch Summary Error] Model '{current_model}' failed: {e}")
+            continue
+
+    print("[Branch Summary Error] All models failed to produce a summary — falling back to placeholder text.")
+    return ""
 
 
 def stream_chat_response(client, model_name, messages_history, system_instruction, attachments=None, attachment=None, context_info="", on_fallback_callback=None):
