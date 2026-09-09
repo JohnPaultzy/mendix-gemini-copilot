@@ -660,8 +660,36 @@ def render_message_bubble(msg):
 if len(messages) > PAGINATION_THRESHOLD:
     older_messages = messages[:-PAGINATION_THRESHOLD]
     recent_messages = messages[-PAGINATION_THRESHOLD:]
-    with st.expander(f"📜 Show earlier messages ({len(older_messages)} more)", expanded=False):
-        for _older_msg in older_messages:
+    total_older = len(older_messages)
+
+    # Tracks how many of the older messages (counting backward from the
+    # pagination cutoff) are currently revealed. Incremented in fixed
+    # batches so that even clicking "load more" on a chat with thousands of
+    # messages only ever renders one bounded batch at a time — never the
+    # whole remaining history in a single click.
+    _revealed_key = f"revealed_older_{st.session_state.session_id}"
+    if _revealed_key not in st.session_state:
+        st.session_state[_revealed_key] = 0
+
+    revealed = min(st.session_state[_revealed_key], total_older)
+    remaining = total_older - revealed
+
+    if remaining > 0:
+        load_amount = min(PAGINATION_THRESHOLD, remaining)
+        if st.button(
+            f"📜 Load {load_amount} earlier messages ({remaining} more not shown)",
+            key=f"load_more_btn_{st.session_state.session_id}"
+        ):
+            st.session_state[_revealed_key] = revealed + load_amount
+            st.rerun()
+
+    if revealed > 0:
+        if st.button("📤 Hide earlier messages", key=f"hide_older_btn_{st.session_state.session_id}"):
+            st.session_state[_revealed_key] = 0
+            st.rerun()
+        # Revealed messages closest to "recent" show first (i.e. counting
+        # backward from the pagination cutoff), keeping overall chronological order.
+        for _older_msg in older_messages[-revealed:]:
             render_message_bubble(_older_msg)
 else:
     recent_messages = messages

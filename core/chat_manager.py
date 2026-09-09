@@ -220,7 +220,7 @@ def transfer_session_to_new(current_session_id, new_session_id):
             (new_session_id, new_title, sys_prompt, datetime.now())
         )
         
-        summary_text = f"🔄 **[SESSION TRANSFERRED FROM: '{old_title}']**\n\nNapadayon kini nga panagsultianay gikan sa karaan nga chat session. Ang tanang context sa gi-upload nga Mendix files ug guidelines nagpabilin nga aktibo."
+        summary_text = f"🔄 **[SESSION TRANSFERRED FROM: '{old_title}']**\n\nThis conversation continues from the previous chat session. All context from uploaded Mendix files and guidelines remains active."
         cursor.execute(
             "INSERT INTO messages (session_id, role, content, has_attachment, created_at) VALUES (?, ?, ?, ?, ?)",
             (new_session_id, "assistant", summary_text, 1, datetime.now())
